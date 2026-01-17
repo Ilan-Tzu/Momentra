@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from .models import Job, JobCandidate, Task, JobStatus
-from .schemas import JobCreate, JobCandidateRead
+from .schemas import JobCreate, JobCandidateRead, JobCandidateUpdate
 import os
 import json
 from datetime import datetime
@@ -78,7 +78,14 @@ class JobService:
                 job_id=job.id,
                 description=f"Ambiguity: {amb.get('message')}",
                 command_type="AMBIGUITY",
-                parameters={"type": amb.get("type"), "message": amb.get("message")},
+                parameters={
+                    "type": amb.get("type"), 
+                    "message": amb.get("message"),
+                    "options": [
+                        {"label": opt.get("label"), "value": opt.get("value")} 
+                        for opt in amb.get("options", [])
+                    ]
+                },
                 confidence=0.0
             )
             self.db.add(candidate)
@@ -133,3 +140,30 @@ class JobService:
             return datetime.fromisoformat(dt_str)
         except:
             return None
+
+    def update_candidate(self, candidate_id: int, update_data: JobCandidateUpdate) -> JobCandidate:
+        candidate = self.db.query(JobCandidate).filter(JobCandidate.id == candidate_id).first()
+        if not candidate:
+            raise ValueError("Candidate not found")
+        
+        if update_data.description is not None:
+            candidate.description = update_data.description
+            
+        if update_data.command_type is not None:
+            candidate.command_type = update_data.command_type
+        
+        if update_data.parameters is not None:
+            # Simple merge or replace? For simplicity, replace the dict or specific keys.
+            # SQLAlchemy mutable dicts can be tricky; let's specific replace for now.
+            candidate.parameters = update_data.parameters
+            
+        self.db.commit()
+        self.db.refresh(candidate)
+        return candidate
+
+    def delete_candidate(self, candidate_id: int):
+        candidate = self.db.query(JobCandidate).filter(JobCandidate.id == candidate_id).first()
+        if not candidate:
+            raise ValueError("Candidate not found")
+        self.db.delete(candidate)
+        self.db.commit()

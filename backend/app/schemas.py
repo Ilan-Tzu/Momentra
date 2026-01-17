@@ -23,6 +23,11 @@ class JobCandidateRead(BaseModel):
     class Config:
         from_attributes = True
 
+class JobCandidateUpdate(BaseModel):
+    description: Optional[str] = None
+    command_type: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+
 class JobRead(BaseModel):
     id: int
     status: JobStatus

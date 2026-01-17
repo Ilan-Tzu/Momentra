@@ -43,3 +43,20 @@ def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.patch("/candidates/{candidate_id}", response_model=schemas.JobCandidateRead)
+def update_candidate(candidate_id: int, candidate_update: schemas.JobCandidateUpdate, db: Session = Depends(get_db)):
+    service = services.JobService(db)
+    try:
+        return service.update_candidate(candidate_id, candidate_update)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.delete("/candidates/{candidate_id}", status_code=204)
+def delete_candidate(candidate_id: int, db: Session = Depends(get_db)):
+    service = services.JobService(db)
+    try:
+        service.delete_candidate(candidate_id)
+        return
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

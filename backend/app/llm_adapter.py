@@ -34,9 +34,14 @@ class AICandidate(BaseModel):
     description: Optional[str] = Field(None, description="Extra context or details")
     confidence: float = Field(..., description="0.0 to 1.0 confidence score")
 
+class AmbiguityOption(BaseModel):
+    label: str = Field(..., description="Button text, e.g. '8 AM'")
+    value: str = Field(..., description="JSON string of parameters to apply if selected, e.g. '{\"title\": \"Meeting\", \"start_time\": \"2026-01-17T08:00:00\"}'")
+
 class AIAmbiguity(BaseModel):
     type: str = Field(..., description="Category: 'missing_time', 'conflict', 'unclear_intent'")
     message: str = Field(..., description="Question to ask the user to resolve this")
+    options: List[AmbiguityOption] = Field(default_factory=list, description="Suggested resolution options")
 
 class AICommand(BaseModel):
     type: str = Field(..., description="Action: 'CLEAR_DAY', 'RESCHEDULE_ALL', etc.")
@@ -78,17 +83,28 @@ class LLMAdapter:
         Step 2: Extract tasks, calendar commands, and ambiguities.
         
         Rules for Ambiguity:
-          1. If AM/PM is missing (e.g. "at 8"), you MUST create an Ambiguity entry asking "Did you mean 8 AM or 8 PM?". DO NOT create a Task in this case.
-          2. If the date is vague ("later"), create an Ambiguity.
-          3. If your confidence in the guessed time is below 0.9, you MUST generate an ambiguity instead of a task.
+          1. If AM/PM is missing (e.g. "at 8"), you MUST create an Ambiguity entry.
+          2. PROVIDE OPTIONS for resolution. For "at 8", provide options for 8 AM and 8 PM.
+             The 'value' of an option must be a JSON string that represents a VALID TASK (title, start_time, end_time) that solves the ambiguity.
+          3. If the date is vague ("later"), create an Ambiguity.
+          4. If your confidence in the guessed time is below 0.9, you MUST generate an ambiguity.
           
         - Convert all relative times (tomorrow, next tuesday) to absolute ISO timestamps based on Current Time.
         
         Example JSON Output:
         {{
-          "reasoning": "User said 'at 8' without AM/PM. This is ambiguous.",
+          "reasoning": "User said 'at 8' without AM/PM. Conflicting.",
           "tasks": [],
-          "ambiguities": [{{"type": "unclear_time", "message": "Did you mean 8 AM or 8 PM?"}}],
+          "ambiguities": [
+            {{
+                "type": "unclear_time", 
+                "message": "Did you mean 8 AM or 8 PM?",
+                "options": [
+                    {{"label": "8 AM", "value": "{{\\"start_time\\": \\"2026-01-17T08:00:00\\", \\"end_time\\": \\"2026-01-17T09:00:00\\"}}"}},
+                    {{"label": "8 PM", "value": "{{\\"start_time\\": \\"2026-01-17T20:00:00\\", \\"end_time\\": \\"2026-01-17T21:00:00\\"}}"}}
+                ]
+            }}
+          ],
           "commands": []
         }}
         """
