@@ -8,15 +8,27 @@ from .schemas import JobStatus
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)
+    
+    jobs = relationship("Job", back_populates="user")
+    tasks = relationship("Task", back_populates="user")
+
 class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # made nullable for migration ease/backward compat, but logically should be required later
     raw_text = Column(Text, nullable=False)
     status = Column(SqlEnum(JobStatus), default=JobStatus.CREATED)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
+    user = relationship("User", back_populates="jobs")
     candidates = relationship("JobCandidate", back_populates="job", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="source_job")
 
@@ -38,6 +50,7 @@ class Task(Base):
     __tablename__ = "tasks"
     
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     source_job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
     
     title = Column(String, nullable=False)
@@ -45,4 +58,5 @@ class Task(Base):
     end_time = Column(DateTime, nullable=True)
     description = Column(Text, nullable=True)
     
+    user = relationship("User", back_populates="tasks")
     source_job = relationship("Job", back_populates="tasks")

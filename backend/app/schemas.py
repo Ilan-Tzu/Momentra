@@ -53,6 +53,26 @@ class TaskRead(BaseModel):
     class Config:
         from_attributes = True
 
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    description: Optional[str] = None
+
+class UserRead(BaseModel):
+    id: int
+    username: str
+    class Config:
+        from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
 class JobExecuteResponse(BaseModel):
     job_id: int
     status: JobStatus

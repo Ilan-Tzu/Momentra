@@ -1,16 +1,56 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
 
 from . import schemas, services
 from .database import get_db
+import shutil
+import os
+import tempfile
 
 router = APIRouter()
 
-@router.post("/jobs", response_model=schemas.JobRead)
-def create_job(job: schemas.JobCreate, db: Session = Depends(get_db)):
+@router.post("/auth/register", response_model=schemas.UserRead)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     service = services.JobService(db)
-    return service.create_job(job)
+    try:
+        return service.create_user(user.username, user.password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/auth/login", response_model=schemas.UserRead)
+def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
+    user = services.JobService(db).authenticate_user(user_login.username, user_login.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
+
+@router.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Create a temporary file to save the upload
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
+        shutil.copyfileobj(file.file, temp_file)
+        temp_path = temp_file.name
+    
+    try:
+        service = services.JobService(db)
+        text = service.llm.transcribe_audio(temp_path)
+        return {"text": text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Cleanup
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@router.post("/jobs", response_model=schemas.JobRead)
+def create_job(job: schemas.JobCreate, db: Session = Depends(get_db), x_user_id: str = Header(None)):
+    if not x_user_id:
+        raise HTTPException(status_code=400, detail="X-User-Id header required")
+    service = services.JobService(db)
+    user = service.get_or_create_user(x_user_id)
+    return service.create_job(job, user.id)
 
 @router.post("/jobs/{job_id}/parse", response_model=dict)
 def parse_job(job_id: int, db: Session = Depends(get_db)):
@@ -57,6 +97,31 @@ def delete_candidate(candidate_id: int, db: Session = Depends(get_db)):
     service = services.JobService(db)
     try:
         service.delete_candidate(candidate_id)
+        return
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/tasks", response_model=List[schemas.TaskRead])
+def get_tasks(start_date: datetime, end_date: datetime, db: Session = Depends(get_db), x_user_id: str = Header(None)):
+    if not x_user_id:
+        raise HTTPException(status_code=400, detail="X-User-Id header required")
+    service = services.JobService(db)
+    user = service.get_or_create_user(x_user_id)
+    return service.get_tasks(start_date, end_date, user.id)
+
+@router.patch("/tasks/{task_id}", response_model=schemas.TaskRead)
+def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
+    service = services.JobService(db)
+    try:
+        return service.update_task(task_id, task_update)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    service = services.JobService(db)
+    try:
+        service.delete_task(task_id)
         return
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

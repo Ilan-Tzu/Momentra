@@ -1,0 +1,128 @@
+.calendar-strip {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px 4px;
+    scroll-behavior: smooth;
+    /* Restore Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.3) rgba(255, 255, 255, 0.05);
+    max-width: 100%;
+}
+
+/* Custom Scrollbar for Webkit */
+.calendar-strip::-webkit-scrollbar {
+    height: 6px;
+    /* Sleek functional scrollbar */
+    display: block;
+}
+
+.calendar-strip::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.calendar-strip::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.3);
+    border-radius: 4px;
+}
+
+.calendar-strip::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 85, 247, 0.5);
+}
+
+.calendar-day-btn {
+    min-width: 90px;
+    /* Snippet uses min-w-[90px] */
+    height: 110px;
+    /* Taller to fit month */
+    background: rgba(255, 255, 255, 0.05);
+    /* bg-white/5 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* border-white/10 */
+    border-radius: 16px;
+    /* rounded-2xl */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    color: white;
+    position: relative;
+    padding: 16px;
+}
+
+.calendar-day-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+    box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.2);
+}
+
+/* Today State */
+.calendar-day-btn.today {
+    background: linear-gradient(135deg, #A855F7, #7C3AED);
+    /* from-purple-500 to-violet-600 */
+    box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.5);
+    border: none;
+}
+
+/* Selected State (if not today) */
+.calendar-day-btn.selected:not(.today) {
+    background: rgba(168, 85, 247, 0.2);
+    /* bg-purple-500/20 */
+    border-color: rgba(192, 132, 252, 0.5);
+    /* border-purple-400/50 */
+    box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.3);
+}
+
+.day-name {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    opacity: 0.7;
+    text-transform: capitalize;
+    /* Snippet is Sun/Mon */
+}
+
+.day-number {
+    font-size: 24px;
+    /* text-2xl */
+    font-weight: 300;
+    /* font-light */
+    margin-bottom: 4px;
+}
+
+.month-name {
+    font-size: 12px;
+    /* text-xs */
+    opacity: 0.6;
+}
+
+.task-dots {
+    display: flex;
+    gap: 3px;
+    position: absolute;
+    bottom: 8px;
+    /* Position dots at bottom */
+}
+
+.dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: white;
+    /* Dots white on purple bg */
+    opacity: 0.8;
+}
+
+.dot.plus {
+    background: none;
+    color: white;
+    font-size: 8px;
+    line-height: 4px;
+    width: auto;
+    opacity: 1;
+}

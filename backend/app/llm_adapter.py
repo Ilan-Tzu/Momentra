@@ -39,6 +39,7 @@ class AmbiguityOption(BaseModel):
     value: str = Field(..., description="JSON string of parameters to apply if selected, e.g. '{\"title\": \"Meeting\", \"start_time\": \"2026-01-17T08:00:00\"}'")
 
 class AIAmbiguity(BaseModel):
+    title: str = Field(..., description="A short tentative title for the ambiguous task, e.g. 'Dinner' or 'Meeting'")
     type: str = Field(..., description="Category: 'missing_time', 'conflict', 'unclear_intent'")
     message: str = Field(..., description="Question to ask the user to resolve this")
     options: List[AmbiguityOption] = Field(default_factory=list, description="Suggested resolution options")
@@ -52,6 +53,8 @@ class AIParseResult(BaseModel):
     tasks: List[AICandidate]
     commands: List[AICommand]
     ambiguities: List[AIAmbiguity]
+
+from datetime import datetime
 
 class LLMAdapter:
     def parse_text(self, text: str, user_timezone: str = "UTC") -> dict:
@@ -74,22 +77,41 @@ class LLMAdapter:
                  "ambiguities": []
              }
              
+        # Calculate current time dynamically
+        current_dt = datetime.now()
+        current_date_str = current_dt.strftime("%Y-%m-%d (%A)")
+        
+        # Generator next 7 days context to help LLM resolve "Friday", "Next Tuesday" etc.
+        from datetime import timedelta
+        upcoming_days_context = "\n".join([
+            (current_dt + timedelta(days=i)).strftime(f"          - +{i} days: %Y-%m-%d (%A)")
+            for i in range(8)
+        ])
+             
         system_prompt = f"""
         You are an AI Calendar Assistant. 
-        Current Time (Context): 2026-01-16 (Friday).
+        Current Time (Context): {current_date_str}.
         User Timezone: {user_timezone}.
+        
+        Upcoming Days Reference:
+{upcoming_days_context}
+
         
         Step 1: Analyze the input in the 'reasoning' field. explicitely state what is vague.
         Step 2: Extract tasks, calendar commands, and ambiguities.
         
         Rules for Ambiguity:
-          1. If AM/PM is missing (e.g. "at 8"), you MUST create an Ambiguity entry.
-          2. PROVIDE OPTIONS for resolution. For "at 8", provide options for 8 AM and 8 PM.
-             The 'value' of an option must be a JSON string that represents a VALID TASK (title, start_time, end_time) that solves the ambiguity.
-          3. If the date is vague ("later"), create an Ambiguity.
-          4. If your confidence in the guessed time is below 0.9, you MUST generate an ambiguity.
+          1. If time is clearly specified (e.g. "10am", "10 PM", "15:00"), extract it directly.
+          2. ONLY determine Ambiguity if AM/PM is missing AND context doesn't clarify (e.g. "at 8").
+          3. When generating an Ambiguity:
+             - Provide logical options (e.g. 8 AM vs 8 PM).
+             - The 'value' must be a valid JSON string for Task parameters.
+             - Generate a SHORT Title for the ambiguity (e.g. "Meeting Time?").
           
-        - Convert all relative times (tomorrow, next tuesday) to absolute ISO timestamps based on Current Time.
+          4. Convert relative dates (tomorrow, next monday, friday) to ISO timestamps using Current Time context.
+          
+        - IMPORTANT: If user says a weekday (e.g. "Friday") and today is Sunday, it means the UPCOMING Friday (not past).
+        - Current Date is {current_date_str}. "Friday" should be calculated relative to THIS date.
         
         Example JSON Output:
         {{
@@ -97,6 +119,7 @@ class LLMAdapter:
           "tasks": [],
           "ambiguities": [
             {{
+                "title": "Meeting Time?",
                 "type": "unclear_time", 
                 "message": "Did you mean 8 AM or 8 PM?",
                 "options": [
@@ -131,3 +154,22 @@ class LLMAdapter:
             print(f"OpenAI Error: {e}")
             # Fallback to an error state or empty result so app doesn't crash
             return {"tasks": [], "commands": [], "ambiguities": [{"type": "error", "message": f"AI Parsing Error: {str(e)}"}]}
+
+    def transcribe_audio(self, file_path: str) -> str:
+        """
+        Transcribes audio file using OpenAI's Whisper model.
+        """
+        if not client.api_key or client.api_key == "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx":
+             return "Mock transcription: Meeting with team tomorrow at 10am."
+             
+        try:
+            with open(file_path, "rb") as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-1", 
+                    file=audio_file,
+                    response_format="text"
+                )
+            return transcription
+        except Exception as e:
+            print(f"Transcription Error: {e}")
+            raise e
