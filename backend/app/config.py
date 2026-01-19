@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     # Optional settings with defaults
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "AI Calendar Backend"
+    ENFORCE_HTTPS: bool = False  # Default to False for local development
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "0.0.0.0"]
     
     model_config = SettingsConfigDict(
         env_file=".env",

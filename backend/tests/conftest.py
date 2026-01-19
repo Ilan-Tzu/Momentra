@@ -1,5 +1,11 @@
 import pytest
 import os
+
+# Set required environment variables for testing BEFORE imports
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-key-conftest")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id-conftest")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

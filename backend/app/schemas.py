@@ -1,7 +1,15 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from enum import Enum
 from datetime import datetime
+import bleach
+
+def sanitize_string(v: Any) -> Any:
+    if isinstance(v, str):
+        # Strip whitespace and clean HTML to prevent XSS
+        # tags=[] and attributes={} means all HTML is stripped/escaped
+        return bleach.clean(v.strip(), tags=[], attributes={}, strip=True)
+    return v
 
 class JobStatus(str, Enum):
     CREATED = "created"
@@ -12,6 +20,11 @@ class JobStatus(str, Enum):
 class JobCreate(BaseModel):
     raw_text: str
     user_local_time: Optional[str] = None  # ISO format with timezone, e.g., "2026-01-19T10:00:00+02:00"
+
+    @field_validator("raw_text")
+    @classmethod
+    def sanitize_input(cls, v):
+        return sanitize_string(v)
 
 class JobCandidateRead(BaseModel):
     id: int
@@ -29,6 +42,20 @@ class JobCandidateUpdate(BaseModel):
     command_type: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
     ignore_conflicts: Optional[bool] = False
+
+    @field_validator("description", "command_type")
+    @classmethod
+    def sanitize_input(cls, v):
+        if v is None: return v
+        return sanitize_string(v)
+
+    @field_validator("parameters")
+    @classmethod
+    def sanitize_parameters(cls, v):
+        if v is None: return v
+        if isinstance(v, dict):
+            return {k: sanitize_string(val) if isinstance(val, str) else val for k, val in v.items()}
+        return v
 
 class JobRead(BaseModel):
     id: int
@@ -63,6 +90,12 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     ignore_conflicts: Optional[bool] = False
 
+    @field_validator("title", "description")
+    @classmethod
+    def sanitize_input(cls, v):
+        if v is None: return v
+        return sanitize_string(v)
+
 class UserRead(BaseModel):
     id: int
     username: str
@@ -73,9 +106,19 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
+    @field_validator("username")
+    @classmethod
+    def sanitize_input(cls, v):
+        return sanitize_string(v)
+
 class UserLogin(BaseModel):
     username: str
     password: str
+
+    @field_validator("username")
+    @classmethod
+    def sanitize_input(cls, v):
+        return sanitize_string(v)
 
 class GoogleAuth(BaseModel):
     id_token: str

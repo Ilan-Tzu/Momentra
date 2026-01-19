@@ -62,6 +62,13 @@ class LLMAdapter:
         Sends text to OpenAI and enforces a strict JSON schema return.
         user_local_time: ISO format with timezone, e.g., "2026-01-19T10:00:00+02:00"
         """
+        # --- CHECK CACHE FIRST ---
+        from .rate_limit import get_cached_response, cache_response
+        
+        cached = get_cached_response(text, user_local_time)
+        if cached:
+            return cached
+        
         # --- MOCK/FALLBACK IF NO KEY ---
         if not client.api_key or client.api_key == "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx":
              print("Warning: OPENAI_API_KEY invalid or missing. Using mock response.")
@@ -195,7 +202,12 @@ class LLMAdapter:
             parsed_data = completion.choices[0].message.parsed
             
             # Convert back to dict for the Service layer
-            return parsed_data.model_dump()
+            result = parsed_data.model_dump()
+            
+            # Cache the successful response
+            cache_response(text, user_local_time, result)
+            
+            return result
 
         except Exception as e:
             print(f"OpenAI Error: {e}")
@@ -205,17 +217,33 @@ class LLMAdapter:
     def transcribe_audio(self, file_path: str) -> str:
         """
         Transcribes audio file using OpenAI's Whisper model.
+        Uses caching to avoid redundant transcriptions.
         """
+        from .rate_limit import get_cached_transcription, cache_transcription
         if not client.api_key or client.api_key == "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx":
              return "Mock transcription: Meeting with team tomorrow at 10am."
              
         try:
+            # Read audio file for caching
+            with open(file_path, "rb") as f:
+                audio_bytes = f.read()
+            
+            # Check cache
+            cached = get_cached_transcription(audio_bytes)
+            if cached:
+                return cached
+            
+            # Make API call
             with open(file_path, "rb") as audio_file:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1", 
                     file=audio_file,
                     response_format="text"
                 )
+            
+            # Cache result
+            cache_transcription(audio_bytes, transcription)
+            
             return transcription
         except Exception as e:
             print(f"Transcription Error: {e}")

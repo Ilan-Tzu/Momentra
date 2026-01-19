@@ -11,3 +11,10 @@ pytest
 httpx
 pytest-asyncio
 pydantic-settings
+slowapi
+cachetools
+passlib[bcrypt]
+python-multipart
+python-dateutil
+google-auth
+bleach

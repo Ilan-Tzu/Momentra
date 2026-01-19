@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
 
 from . import schemas, services
 from .database import get_db
+from .rate_limit import limiter
 import shutil
 import os
 import tempfile
@@ -12,7 +13,8 @@ import tempfile
 router = APIRouter()
 
 @router.post("/auth/register", response_model=schemas.UserRead)
-def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def register_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     service = services.JobService(db)
     try:
         return service.create_user(user.username, user.password)
@@ -20,14 +22,16 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/auth/login", response_model=schemas.UserRead)
-def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, user_login: schemas.UserLogin, db: Session = Depends(get_db)):
     user = services.JobService(db).authenticate_user(user_login.username, user_login.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return user
 
 @router.post("/auth/google")
-def google_login(auth_data: schemas.GoogleAuth, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def google_login(request: Request, auth_data: schemas.GoogleAuth, db: Session = Depends(get_db)):
     """Authenticate user via Google OAuth."""
     service = services.JobService(db)
     try:
@@ -50,7 +54,8 @@ def google_login(auth_data: schemas.GoogleAuth, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail=str(e))
 
 @router.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+async def transcribe_audio(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     # Create a temporary file to save the upload
     with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
         shutil.copyfileobj(file.file, temp_file)
@@ -76,7 +81,8 @@ def create_job(job: schemas.JobCreate, db: Session = Depends(get_db), x_user_id:
     return service.create_job(job, user.id)
 
 @router.post("/jobs/{job_id}/parse", response_model=dict)
-def parse_job(job_id: int, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def parse_job(request: Request, job_id: int, db: Session = Depends(get_db)):
     service = services.JobService(db)
     try:
         count = service.parse_job(job_id)

@@ -1,3 +1,21 @@
+/**
+ * TIMEZONE STRATEGY (Momentra)
+ * ============================
+ * 
+ * RULE: Database & Backend ALWAYS run in UTC. No exceptions.
+ *       Frontend converts UTC → Local Time for display.
+ * 
+ * Data Flow:
+ * 1. User Input (Local) → toUTC() → Backend (stores as naive UTC)
+ * 2. Backend (naive UTC) → normalizeToUTC() → formatToLocalTime() → Display (Local)
+ * 
+ * Key Functions:
+ * - normalizeToUTC(str): Appends 'Z' to naive UTC strings from backend
+ * - formatToLocalTime(isoZ): Converts UTC ISO to local HH:MM display
+ * - toUTC(localIso): Converts local datetime-local input to UTC ISO
+ * - toLocalISOString(date): Formats Date object as local YYYY-MM-DDTHH:MM:SS
+ */
+
 export const formatToLocalTime = (isoString) => {
     if (!isoString) return '00:00';
     try {

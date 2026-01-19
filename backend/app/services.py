@@ -6,6 +6,22 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 
+# =============================================================================
+# TIMEZONE STRATEGY (Momentra Backend)
+# =============================================================================
+# RULE: Database & Backend ALWAYS run in UTC. No exceptions.
+# 
+# All datetimes stored in the database are NAIVE UTC (no tzinfo).
+# 
+# Key Methods:
+# - _parse_datetime(str): Parses any ISO string → naive UTC datetime
+# - _normalize_aware_dt(dt): Converts aware datetime → naive UTC
+# 
+# Incoming data from frontend should be UTC (with 'Z' suffix).
+# Outgoing data to frontend is naive UTC (frontend appends 'Z').
+# =============================================================================
+
+
 from .llm_adapter import LLMAdapter
 
 from passlib.context import CryptContext
@@ -237,10 +253,10 @@ class JobService:
         from datetime import timedelta
         
         # Normalize to naive UTC for safe comparison
-        if start1 and start1.tzinfo: start1 = start1.replace(tzinfo=None)
-        if end1 and end1.tzinfo: end1 = end1.replace(tzinfo=None)
-        if start2 and start2.tzinfo: start2 = start2.replace(tzinfo=None)
-        if end2 and end2.tzinfo: end2 = end2.replace(tzinfo=None)
+        start1 = self._normalize_aware_dt(start1)
+        end1 = self._normalize_aware_dt(end1)
+        start2 = self._normalize_aware_dt(start2)
+        end2 = self._normalize_aware_dt(end2)
         
         # If end times are not set or equal to start, assume 30 min duration
         if not end1 or (start1 and end1 <= start1):
