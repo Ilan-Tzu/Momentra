@@ -134,6 +134,13 @@ class JobService:
         self.db.refresh(job)
         return job
 
+    def _is_background_event(self, title: str) -> bool:
+        """Determines if a task title suggests a background/logistics event (Airbnb, Hotel, etc.)"""
+        # "Flight" is removed because it SHOULD be blocking (you can't do other things during a flight)
+        background_keywords = ["airbnb", "hotel", "stay", "trip", "vacation", "rent", "check-in", "check-out"]
+        t = title.lower()
+        return any(kw in t for kw in background_keywords)
+
     def parse_job(self, job_id: int, user_id: int) -> int:
         job = self.db.query(Job).filter(Job.id == job_id, Job.user_id == user_id).first()
         if not job:
@@ -155,18 +162,25 @@ class JobService:
         for task in result.get("tasks", []):
             new_start = self._parse_datetime(task.get("start_time"))
             new_end = self._parse_datetime(task.get("end_time"))
-            print(f"DEBUG: New task '{task.get('title')}' - start: {new_start}, end: {new_end}")
+            task_title = task.get("title", "New Task")
+            print(f"DEBUG: New task '{task_title}' - start: {new_start}, end: {new_end}")
             
             # Check for conflicts with existing tasks
             conflict_found = self._find_conflict(job.user_id, new_start, new_end) if new_start else None
             
-            if conflict_found:
+            # Allow background events (Airbnb, etc.) to skip conflict ambiguity
+            is_background_cand = self._is_background_event(task_title)
+            is_background_existing = self._is_background_event(conflict_found.title) if conflict_found else False
+            
+            should_raise_conflict = conflict_found and not (is_background_cand or is_background_existing)
+
+            if should_raise_conflict:
                 candidate = JobCandidate(
                     job_id=job.id,
-                    description=f"Conflict: {task.get('title', 'New Task')}",
+                    description=f"Conflict: {task_title}",
                     command_type="AMBIGUITY",
                     parameters=self._format_conflict_parameters(
-                        task.get("title", "New Task"),
+                        task_title,
                         task.get("start_time"),
                         task.get("end_time"),
                         conflict_found
@@ -176,17 +190,17 @@ class JobService:
                 self.db.add(candidate)
                 candidates.append(candidate)
             else:
-                # No conflict, but check if time is missing
+                # No conflict OR background event - but check if time is missing
                 if not task.get("start_time"):
                     # Missing time - Convert to Ambiguity
                     candidate = JobCandidate(
                         job_id=job.id,
-                        description=f"Ambiguity: Missing time for '{task.get('title', 'Task')}'",
+                        description=f"Ambiguity: Missing time for '{task_title}'",
                         command_type="AMBIGUITY",
                         parameters={
                             "type": "missing_time",
-                            "message": f"What time is '{task.get('title', 'Task')}'?",
-                            "options": [] # Frontend can offer time picker or we can just let user edit
+                            "message": f"What time is '{task_title}'?",
+                            "options": [] 
                         },
                         confidence=0.0
                     )
@@ -194,10 +208,10 @@ class JobService:
                     # Valid task candidate
                     candidate = JobCandidate(
                         job_id=job.id,
-                        description=task.get("title", ""),
+                        description=task_title,
                         command_type="CREATE_TASK",
                         parameters={
-                            "title": task.get("title"),
+                            "title": task_title,
                             "start_time": task.get("start_time"),
                             "end_time": task.get("end_time"),
                             "description": task.get("description")
@@ -268,21 +282,20 @@ class JobService:
         if not start1 or not start2:
             return False
         
-        # Check if same day first (for performance)
-        if start1.date() != start2.date():
-            return False
-        
-        # Overlap exists if one starts before the other ends (inclusive for same start time)
-        # Also catch exact same start time as a conflict
-        return (start1 < end2 and start2 < end1) or (start1 == start2)
+        # Overlap exists if one interval starts before the other ends (and vice versa)
+        return (start1 < end2 and start2 < end1)
 
     def _find_conflict(self, user_id: int, start_time: datetime, end_time: datetime) -> Optional[Task]:
-        """Find an overlapping task for the user."""
+        """Find an overlapping BLOCKING task for the user."""
         if not start_time:
             return None
         
-        # Get existing user tasks
-        existing_tasks = self.db.query(Task).filter(Task.user_id == user_id).all()
+        # Get existing user tasks that are BLOCKING
+        existing_tasks = self.db.query(Task).filter(
+            Task.user_id == user_id, 
+            Task.is_blocking == True
+        ).all()
+        
         for existing in existing_tasks:
             if existing.start_time:
                 if self._times_overlap(start_time, end_time, existing.start_time, existing.end_time):
@@ -355,15 +368,18 @@ class JobService:
                 continue
                 
             # Simple mapping logic
+            is_blocking = not self._is_background_event(params.get("title", cand.description))
+            
             task = Task(
                 source_job_id=job.id,
                 user_id=job.user_id,
                 title=params.get("title", cand.description),
                 start_time=start_time,
                 end_time=self._parse_datetime(params.get("end_time")),
-                description=params.get("description", "")
+                description=params.get("description", ""),
+                is_blocking=is_blocking
             )
-            print(f"DEBUG: Creating Task: title='{task.title}', start={task.start_time}, user_id={task.user_id}")
+            print(f"DEBUG: Creating Task: title='{task.title}', is_blocking={is_blocking}, start={task.start_time}")
             self.db.add(task)
             created_tasks.append(task)
         

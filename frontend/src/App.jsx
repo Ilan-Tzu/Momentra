@@ -260,10 +260,15 @@ function App() {
         await jobService.updateTask(id, {
           title: updatedEvent.title,
           description: updatedEvent.description,
-          start_time: toUTC(updatedEvent.start_time), // Local ISO -> UTC
+          start_time: toUTC(updatedEvent.start_time),
           end_time: toUTC(updatedEvent.end_time)
         });
         await fetchCalendarTasks();
+        // Update selected date to the new start date to "follow" the task
+        const newDate = new Date(updatedEvent.start_time);
+        if (!isNaN(newDate.getTime())) {
+          setSelectedDate(newDate);
+        }
       } else {
         // Candidate
         const id = updatedEvent.id;
@@ -355,11 +360,28 @@ function App() {
 
 
   const selectedDayTasks = calendarTasks.filter(task => {
-    if (!task.start_time) return false;
-    const tDate = new Date(task.start_time);
-    return tDate.getDate() === selectedDate.getDate() &&
-      tDate.getMonth() === selectedDate.getMonth() &&
-      tDate.getFullYear() === selectedDate.getFullYear();
+    if (!task.start_time || !task.end_time) return false;
+    // Use local time for range checking
+    try {
+      const targetDateStr = toLocalISOString(selectedDate).split('T')[0];
+      const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
+      const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+
+      return targetDateStr >= startLocal && targetDateStr <= endLocal;
+    } catch (e) { return false; }
+  }).map(task => {
+    // Add visual segment info
+    const targetDateStr = toLocalISOString(selectedDate).split('T')[0];
+    const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
+    const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+
+    let taskType = 'normal';
+    if (startLocal !== endLocal) {
+      if (targetDateStr === startLocal) taskType = 'task-start';
+      else if (targetDateStr === endLocal) taskType = 'task-end';
+      else taskType = 'task-middle';
+    }
+    return { ...task, taskType };
   });
   // Render login page if not authenticated
   if (!user) {
@@ -369,7 +391,7 @@ function App() {
     try {
       // 1. Update existing task first if changed
       if (conflictModal.existingTask) {
-        const datePart = conflictModal.existingTaskDate || new Date(normalizeToUTC(conflictModal.existingTask.start_time)).toISOString().split('T')[0];
+        const datePart = conflictModal.existingTaskDate || toLocalISOString(new Date(normalizeToUTC(conflictModal.existingTask.start_time))).split('T')[0];
         const timePart = conflictModal.existingTaskTime || '09:00';
         const mergedIso = `${datePart}T${timePart}`;
         const dtObj = new Date(mergedIso);
@@ -430,7 +452,7 @@ function App() {
       }
 
       // 2. Update new task
-      const newDatePart = conflictModal.newTaskDate || new Date(normalizeToUTC(conflictModal.newTask.start_time)).toISOString().split('T')[0];
+      const newDatePart = conflictModal.newTaskDate || toLocalISOString(new Date(normalizeToUTC(conflictModal.newTask.start_time))).split('T')[0];
       const newTimePart = conflictModal.newTaskTime || '09:00';
       const mergedNewIso = `${newDatePart}T${newTimePart}`;
       const newDtObj = new Date(mergedNewIso);
@@ -601,20 +623,27 @@ function App() {
           {selectedDayTasks.length === 0 ? (
             <p className="empty-tasks">No events scheduled</p>
           ) : (
-            selectedDayTasks.map(task => (
-              <div key={task.id} className="task-row">
-                <div className="task-time">
-                  {formatToLocalTime(task.start_time)} - {formatToLocalTime(task.end_time)}
+            selectedDayTasks.map(task => {
+              let displayTime = `${formatToLocalTime(task.start_time)} - ${formatToLocalTime(task.end_time)}`;
+              if (task.taskType === 'task-start') displayTime = `Start ${formatToLocalTime(task.start_time)}`;
+              else if (task.taskType === 'task-end') displayTime = `End ${formatToLocalTime(task.end_time)}`;
+              else if (task.taskType === 'task-middle') displayTime = 'Continued';
+
+              return (
+                <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType}`}>
+                  <div className="task-time">
+                    {displayTime}
+                  </div>
+                  <div className="task-content">
+                    <h4>{task.title}</h4>
+                  </div>
+                  <div className="task-actions">
+                    <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
+                    <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
+                  </div>
                 </div>
-                <div className="task-content">
-                  <h4>{task.title}</h4>
-                </div>
-                <div className="task-actions">
-                  <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
-                  <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -634,7 +663,7 @@ function App() {
 
               <div className="review-body">
                 {candidates.map(candidate => (
-                  <div key={candidate.id} className="review-item-card">
+                  <div key={candidate.id} className={`review-item-card ${candidate.command_type === 'AMBIGUITY' ? 'ambiguity-item' : ''}`}>
                     <div className="card-content">
                       <h3>{candidate.parameters?.title && candidate.parameters.title !== 'CREATE_TASK' ? candidate.parameters.title : (candidate.description !== 'CREATE_TASK' ? candidate.description : 'New Event')}</h3>
 
@@ -672,8 +701,12 @@ function App() {
                                   }
 
                                   const existingTask = calendarTasks.find(t => t.id === existingTaskId);
-                                  const rawTime = val.start_time || candidate.parameters.start_time;
-                                  const conflictTimeLocal = rawTime ? formatToLocalTime(normalizeToUTC(rawTime)) : '09:00';
+                                  const newTaskTime = (val.start_time || candidate.parameters.start_time)
+                                    ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time))
+                                    : '09:00';
+                                  const existingTaskTime = existingTask?.start_time
+                                    ? formatToLocalTime(normalizeToUTC(existingTask.start_time))
+                                    : '09:00';
 
                                   setConflictModal({
                                     isOpen: true,
@@ -689,10 +722,10 @@ function App() {
                                       start_time: existingTask.start_time,
                                       end_time: existingTask.end_time
                                     } : null,
-                                    newTaskTime: conflictTimeLocal,
-                                    existingTaskTime: conflictTimeLocal,
-                                    newTaskDate: val.start_time ? new Date(val.start_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                                    existingTaskDate: existingTask?.start_time ? new Date(existingTask.start_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+                                    newTaskTime,
+                                    existingTaskTime,
+                                    newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
+                                    existingTaskDate: existingTask?.start_time ? toLocalISOString(new Date(existingTask.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0]
                                   });
                                   return;
                                 }
@@ -726,17 +759,21 @@ function App() {
                             ))}
                             <button className="other-opt-btn" onClick={() => {
                               let prefillStart = new Date();
+                              let prefillEnd = null;
                               let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
 
                               if (candidate.parameters.options?.length > 0) {
                                 try {
                                   const firstOpt = JSON.parse(candidate.parameters.options[0].value);
                                   if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
+                                  if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
                                   if (firstOpt.title) prefillTitle = firstOpt.title;
                                 } catch (e) { console.error("Failed to parse first option", e); }
                               }
 
-                              const prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
+                              if (!prefillEnd) {
+                                prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
+                              }
 
                               handleEditOpen({
                                 id: candidate.id,
@@ -753,8 +790,8 @@ function App() {
                         </div>
                       ) : (
                         <div className="candidate-content">
-                          <div className="candidate-meta">
-                            <span>📅 {candidate.parameters.start_time ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString() : 'No date'}</span>
+                          <div className="candidate-meta attention-sparkle">
+                            <span>📅 {candidate.parameters.start_time ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'No date'}</span>
                             <span>🕒 {candidate.parameters.start_time ? (
                               <>
                                 {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time))}
@@ -785,8 +822,8 @@ function App() {
 
                       {candidate.command_type !== 'AMBIGUITY' && (
                         <>
-                          <button className="accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
                           <button className="edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
+                          <button className="accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
                         </>
                       )}
                     </div>
@@ -839,7 +876,7 @@ function App() {
                 <div className="conflict-task-card new-task">
                   <div className="task-badge new">New</div>
                   <h4>{conflictModal.newTask?.title || 'New Task'}</h4>
-                  <div className="edit-time-container">
+                  <div className="edit-time-container attention-sparkle">
                     <div className="edit-time-row-split">
                       <label>Start</label>
                       <div className="split-inputs">
@@ -877,7 +914,7 @@ function App() {
                   <div className="conflict-task-card existing-task">
                     <div className="task-badge existing">Existing</div>
                     <h4>{conflictModal.existingTask?.title || 'Existing Task'}</h4>
-                    <div className="edit-time-container">
+                    <div className="edit-time-container attention-sparkle">
                       <div className="edit-time-row-split">
                         <label>Start</label>
                         <div className="split-inputs">

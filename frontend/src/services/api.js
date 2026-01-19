@@ -145,11 +145,22 @@ const refreshAccessToken = async () => {
 
 export const jobService = {
     createJob: async (rawText) => {
-        // Include user's local time with timezone for accurate parsing
-        const userLocalTime = new Date().toISOString().replace('Z', '') +
-            (new Date().getTimezoneOffset() > 0 ? '-' : '+') +
-            String(Math.abs(Math.floor(new Date().getTimezoneOffset() / 60))).padStart(2, '0') + ':' +
-            String(Math.abs(new Date().getTimezoneOffset() % 60)).padStart(2, '0');
+        // Use literal local time as base, then append offset
+        const now = new Date();
+        const pad = (num) => String(num).padStart(2, '0');
+        const localBase = now.getFullYear() +
+            '-' + pad(now.getMonth() + 1) +
+            '-' + pad(now.getDate()) +
+            'T' + pad(now.getHours()) +
+            ':' + pad(now.getMinutes()) +
+            ':' + pad(now.getSeconds());
+
+        const offsetMin = now.getTimezoneOffset();
+        const offsetSign = offsetMin > 0 ? '-' : '+';
+        const offsetHours = pad(Math.abs(Math.floor(offsetMin / 60)));
+        const offsetMins = pad(Math.abs(offsetMin % 60));
+
+        const userLocalTime = `${localBase}${offsetSign}${offsetHours}:${offsetMins}`;
 
         const response = await api.post('/jobs', {
             raw_text: rawText,

@@ -123,8 +123,8 @@ class LLMAdapter:
         - User's Timezone: {timezone_info}
         
         CRITICAL: ALL TIMES YOU OUTPUT MUST BE IN UTC (with 'Z' suffix).
-        When user says "4pm", convert it to UTC based on their timezone.
-        Example: If user is in UTC+2 and says "4pm", output "2026-01-19T14:00:00Z" (4pm local = 2pm UTC).
+        When user says "4pm", convert it to UTC based on their timezone ({timezone_info}).
+        Example: If user is in UTC+2 and says "8am", output "2026-01-19T06:00:00Z" (8am local = 6am UTC).
         
         Upcoming Days Reference:
 {upcoming_days_context}
@@ -151,9 +151,10 @@ class LLMAdapter:
 
           4. ONLY create Ambiguity if:
              - Time is 1-12 without AM/PM AND context provides NO clues (e.g. "Call Bob at 4").
-             - Do NOT create ambiguity for scheduling conflicts - that is handled separately by the system
+             - NO TIME FOR STAY: For "Airbnb", "Hotel", "Visit", or "Stay" tasks involving dates but missing specific times, ALWAYS raise an Ambiguity to confirm Check-in and Check-out times. Suggest standard times (e.g. 3 PM Check-in, 11 AM Check-out) as 'educated guesses'.
+          
           5. When generating an Ambiguity:
-             - CRITICAL: The 'title' field must be the ACTUAL TASK NAME (e.g. "Dentist Appointment", "Meeting with Bob"). 
+             - CRITICAL: The 'title' field must be the ACTUAL TASK NAME (e.g. "Dentist Appointment", "Meeting with Bob", "Airbnb"). 
              - Do NOT use generic titles like "Meeting Time?" or "Ambiguity".
              - The title should describe WHAT the event is, not WHAT is ambiguous.
              - Provide logical options (e.g. 8 AM vs 8 PM).
@@ -167,18 +168,17 @@ class LLMAdapter:
         - User's Current Date is {current_date_str}. "Friday" should be calculated relative to THIS date.
         - REMEMBER: Output all times in UTC with 'Z' suffix!
         
-        Example JSON Output (Ambiguity Case, times in UTC):
+        Example JSON Output (Stay Ambiguity Case):
         {{
-          "reasoning": "User said 'dentist at 8' without AM/PM. Time is ambiguous. User is in UTC+2.",
+          "reasoning": "User mentioned 'Airbnb from Tuesday to Thursday' without times. Standard check-in is 3pm, check-out 11am. Raising ambiguity to confirm.",
           "tasks": [],
           "ambiguities": [
             {{
-                "title": "Dentist Appointment",
-                "type": "unclear_time", 
-                "message": "Is your dentist appointment at 8 AM or 8 PM?",
+                "title": "Airbnb",
+                "type": "missing_time", 
+                "message": "When are your check-in and check-out times for the Airbnb?",
                 "options": [
-                    {{"label": "8 AM", "value": "{{\\"title\\": \\"Dentist Appointment\\", \\"start_time\\": \\"2026-01-17T06:00:00Z\\", \\"end_time\\": \\"2026-01-17T07:00:00Z\\"}}"}}
-                    {{"label": "8 PM", "value": "{{\\"title\\": \\"Dentist Appointment\\", \\"start_time\\": \\"2026-01-17T18:00:00Z\\", \\"end_time\\": \\"2026-01-17T19:00:00Z\\"}}"}}
+                    {{"label": "Standard (3pm In / 11am Out)", "value": "{{\\"title\\": \\"Airbnb\\", \\"start_time\\": \\"2026-01-20T13:00:00Z\\", \\"end_time\\": \\"2026-01-22T09:00:00Z\\"}}"}}
                 ]
             }}
           ],

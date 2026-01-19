@@ -39,21 +39,24 @@ export const toLocalISOString = (date) => {
         ':' + pad(d.getSeconds());
 };
 
-export const toUTC = (localIso) => {
-    if (!localIso) return null;
-    if (localIso.endsWith('Z')) return localIso;
-    const d = new Date(localIso);
-    return d.toISOString();
-};
-
 export const normalizeToUTC = (isoString) => {
     if (!isoString) return null;
-    if (isoString.endsWith('Z')) return isoString;
-    // Assume input is UTC if missing Z? 
-    // NO! Existing code appended Z to naive strings from backend.
-    // If backend returns "2026-06-26T11:00:00", it implies UTC (from previous fixes).
-    // So append Z.
+    // If it already has 'Z' or a timezone offset like +02:00 or -0500, don't append Z
+    if (isoString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(isoString)) return isoString;
+
+    // For naive strings from our backend (which are UTC), append Z
     return isoString + 'Z';
+};
+
+export const toUTC = (localIso) => {
+    if (!localIso) return null;
+    // If it's already an explicit UTC string, return it
+    if (localIso.endsWith('Z')) return localIso;
+
+    // Otherwise, parse as local and convert to UTC ISO
+    const d = new Date(localIso);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
 };
 
 export const formatToLocalDate = (dateObj) => {

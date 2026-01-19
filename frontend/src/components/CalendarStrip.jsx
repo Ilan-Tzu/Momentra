@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react';
-import { normalizeToUTC } from '../utils/dateUtils';
+import { normalizeToUTC, toLocalISOString } from '../utils/dateUtils';
 import './CalendarStrip.css';
 
 const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -56,16 +56,62 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
 
     // Helper to check if task is on a specific day
     const getTasksForDate = (date) => {
-        if (!tasks || !Array.isArray(tasks)) return [];
-        return tasks.filter(task => {
-            if (!task.start_time) return false;
+        if (!tasks || !Array.isArray(tasks)) return { singleDay: [], multiDay: [] };
+
+        const targetDateStr = toLocalISOString(date).split('T')[0];
+
+        const dayTasks = tasks.filter(task => {
+            if (!task.start_time || !task.end_time) return false;
             try {
-                // Treat start_time as UTC (append Z if missing)
-                const st = normalizeToUTC(task.start_time);
-                const t = new Date(st);
-                return t.toDateString() === date.toDateString();
+                // Get local dates for start/end
+                const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
+                const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+
+                // Check if target date is within range [start, end]
+                return targetDateStr >= startLocal && targetDateStr <= endLocal;
             } catch (e) { return false; }
         });
+
+        const singleDay = [];
+        const multiDay = [];
+
+        dayTasks.forEach(task => {
+            try {
+                const startDt = new Date(normalizeToUTC(task.start_time));
+                const endDt = new Date(normalizeToUTC(task.end_time));
+
+                const startLocalStr = toLocalISOString(startDt).split('T')[0];
+                const endLocalStr = toLocalISOString(endDt).split('T')[0];
+
+                if (startLocalStr === endLocalStr) {
+                    singleDay.push(task);
+                } else {
+                    let width = 100;
+                    let left = 0;
+
+                    if (startLocalStr === targetDateStr) {
+                        const startHour = startDt.getHours() + startDt.getMinutes() / 60;
+                        left = (startHour / 24) * 100;
+                        width = 100 - left;
+                    } else if (endLocalStr === targetDateStr) {
+                        const endHour = endDt.getHours() + endDt.getMinutes() / 60;
+                        width = (endHour / 24) * 100;
+                        left = 0;
+                    }
+
+                    multiDay.push({
+                        ...task,
+                        isStart: startLocalStr === targetDateStr,
+                        isEnd: endLocalStr === targetDateStr,
+                        isMiddle: startLocalStr < targetDateStr && endLocalStr > targetDateStr,
+                        width,
+                        left
+                    });
+                }
+            } catch (e) { }
+        });
+
+        return { singleDay, multiDay };
     };
 
     return (
@@ -87,11 +133,27 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
 
                         {/* Hover glow effect (simulated via CSS) */}
 
+                        {/* Multi-Day Task Bars */}
+                        <div className="task-bars-container">
+                            {dayTasks.multiDay.slice(0, 2).map((task, i) => (
+                                <div
+                                    key={task.id || i}
+                                    className={`task-bar ${task.isStart ? 'start' : ''} ${task.isEnd ? 'end' : ''} ${task.isMiddle ? 'middle' : ''}`}
+                                    style={{
+                                        width: `${task.width}%`,
+                                        marginLeft: `${task.left}%`
+                                    }}
+                                ></div>
+                            ))}
+                            {dayTasks.multiDay.length > 2 && <div className="task-bar-overflow"></div>}
+                        </div>
+
+                        {/* Single Day Dots */}
                         <div className="task-dots">
-                            {dayTasks.slice(0, 3).map((_, i) => (
+                            {dayTasks.singleDay.slice(0, 3).map((_, i) => (
                                 <div key={i} className="dot"></div>
                             ))}
-                            {dayTasks.length > 3 && <div className="dot plus">+</div>}
+                            {dayTasks.singleDay.length > 3 && <div className="dot plus">+</div>}
                         </div>
                     </button>
                 );

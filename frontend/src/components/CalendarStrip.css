@@ -32,26 +32,21 @@
 }
 
 .calendar-day-btn {
-    min-width: 90px;
-    /* Snippet uses min-w-[90px] */
-    height: 110px;
-    /* Taller to fit month */
+    min-width: 75px;
+    height: 95px;
     background: rgba(255, 255, 255, 0.05);
-    /* bg-white/5 */
     border: 1px solid rgba(255, 255, 255, 0.1);
-    /* border-white/10 */
-    border-radius: 16px;
-    /* rounded-2xl */
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     cursor: pointer;
     transition: all 0.3s ease;
     flex-shrink: 0;
     color: white;
     position: relative;
-    padding: 16px;
+    padding: 10px 12px;
 }
 
 .calendar-day-btn:hover {
@@ -78,34 +73,78 @@
 }
 
 .day-name {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     opacity: 0.7;
     text-transform: capitalize;
-    /* Snippet is Sun/Mon */
 }
 
 .day-number {
-    font-size: 24px;
-    /* text-2xl */
+    font-size: 20px;
     font-weight: 300;
-    /* font-light */
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .month-name {
-    font-size: 12px;
-    /* text-xs */
+    font-size: 11px;
     opacity: 0.6;
+    margin-bottom: 4px;
+}
+
+/* Multi-Day Task Bars */
+.task-bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    margin-bottom: 4px;
+    margin-top: auto;
+    /* Push to bottom of the button */
+    padding: 0 2px;
+}
+
+.task-bar {
+    height: 3px;
+    width: 100%;
+    background: linear-gradient(90deg, #38BDF8, #0EA5E9);
+    /* Sky/Cyan */
+    opacity: 0.9;
+    border-radius: 0;
+    box-shadow: 0 2px 4px rgba(56, 189, 248, 0.3);
+}
+
+.task-bar.start {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.task-bar.end {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.task-bar.middle {
+    width: 100%;
+    border-radius: 0;
+}
+
+.task-bar-overflow {
+    height: 4px;
+    width: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    align-self: center;
 }
 
 .task-dots {
     display: flex;
     gap: 3px;
-    position: absolute;
-    bottom: 8px;
-    /* Position dots at bottom */
+    /* Remove absolute positioning to stack properly */
+    align-items: center;
+    justify-content: center;
+    height: 8px;
+    /* Fixed height reservation */
 }
 
 .dot {

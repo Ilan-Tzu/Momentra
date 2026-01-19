@@ -79,6 +79,7 @@ class TaskRead(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     description: Optional[str] = None
+    is_blocking: bool = True
     
     class Config:
         from_attributes = True

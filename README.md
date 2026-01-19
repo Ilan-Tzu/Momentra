@@ -16,6 +16,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Voice input**: Speak naturally, Momentra transcribes and schedules
 - **Timezone-aware**: Automatically converts between your local time and UTC
 - **Ambiguity resolution**: If you say "meeting at 8" without AM/PM, Momentra asks for clarification
+- **Stay-aware**: Recognizes "Airbnb", "Hotel", or "Stay" and automatically prompts for check-in/out times with educated guesses (3pm/11am)
 
 ### Intelligent Conflict Management
 - **Real-time conflict detection**: Knows when you're double-booked before you save
@@ -27,6 +28,8 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Glassmorphism design**: Modern, elegant UI with blur effects and gradients
 - **Smooth interactions**: Animated calendar strip with auto-centering on selected dates
 - **Inline editing**: Click to edit tasks directly on the calendar
+- **Multi-day flow**: Visual bars in the strip and connecting vertical lines in the day view for events that span days
+- **Modular Themes**: Modular design with unique skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), and Review (Purple Glass) modes
 - **Google Sign-In**: Seamless authentication with OAuth 2.0
 
 ---
@@ -54,6 +57,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - Timezone-aware parsing
   - Ambiguity detection
   - Conflict-free scheduling recommendations
+  - Stay ambiguity detection for accommodations (Airbnb/Hotels)
   - Natural language understanding for relative dates ("tomorrow", "next Friday")
 
 ---
@@ -69,14 +73,25 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] Vertical task stack for clear comparison
   - [x] "Save Anyway" override with pulse animation
   - [x] Strict time validation (End > Start)
+- **[x] Multi-Day Task Visualization**
+  - [x] **Horizontal Bars**: Sleek 3px bars in the calendar strip spanning multiple days
+  - [x] **Vertical Connectors**: Task list shows "Start", "Continued", and "End" segments with visual connecting lines
+  - [x] **Range Filtering**: Tasks spanning across days are tracked and displayed on every inhabited day
+- [x] **Stay Ambiguity Handling**
+  - [x] Automatic detection of Airbnb/Hotel/Stay keywords without times
+  - [x] "Educated Guess" options for standard check-in (3pm) and check-out (11am)
+  - [x] Intelligent "Other" pre-fill: Carries over AI-suggested dates/times into the manual editor
 - [x] **Unified Event Editing**
-  - [x] Glassmorphic modal for both tasks and candidates
+  - [x] **Cyber-Industrial Theme**: Specialized Sapphire/Indigo theme for the Edit Modal
+  - [x] **Sparkle Animations**: Shimmer/Sweep effects on time inputs to guide user attention
+  - [x] **Auto-Follow Logic**: Calendar automatically jumps to the new date after a task is rescheduled
   - [x] Split date/time inputs with adjustment arrows
   - [x] Duration persistence logic
 - [x] Time ambiguity handling (AM/PM clarification)
-- [x] Calendar strip visualization (30-day view)
-- [x] Task dots indicator (up to 3 per day)
-- [x] Smooth scrolling calendar navigation
+- [x] **Sleek Calendar Strip**
+  - [x] High-density 30-day view (Thinned for better space efficiency)
+  - [x] Task dots indicator (up to 3 per day)
+  - [x] Smooth scrolling calendar navigation
 - [x] Glassmorphism UI design
 - [x] **Vibrant Login Page**
   - [x] "Zen" drift animation with motion trails
@@ -328,5 +343,5 @@ Private - All Rights Reserved
 
 ---
 
-**Last Updated**: January 19, 2026  
-**Version**: 0.6.0-alpha
+**Last Updated**: January 19, 2026 (18:40)  
+**Version**: 0.7.0-alpha

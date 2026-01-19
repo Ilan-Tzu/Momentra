@@ -34,13 +34,16 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
             const startDateObj = startTimeIso ? new Date(startTimeIso) : new Date();
             const endDateObj = endTimeIso ? new Date(endTimeIso) : new Date(startDateObj.getTime() + 30 * 60000);
 
+            const startLocal = toLocalISOString(startDateObj);
+            const endLocal = toLocalISOString(endDateObj);
+
             setForm({
                 title,
                 description,
-                start_date: startDateObj.toISOString().split('T')[0],
-                start_time: formatToLocalTime(startTimeIso), // "HH:MM"
-                end_date: endDateObj.toISOString().split('T')[0],
-                end_time: formatToLocalTime(endTimeIso)
+                start_date: startLocal.split('T')[0],
+                start_time: startLocal.split('T')[1].substring(0, 5), // "HH:MM"
+                end_date: endLocal.split('T')[0],
+                end_time: endLocal.split('T')[1].substring(0, 5)
             });
         }
     }, [isOpen, event, type]);
@@ -60,8 +63,9 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
                 const newStart = new Date(`${next.start_date}T${next.start_time}`);
                 if (!isNaN(newStart.getTime()) && !isNaN(durationMs)) {
                     const newEnd = new Date(newStart.getTime() + durationMs);
-                    next.end_date = newEnd.toISOString().split('T')[0];
-                    next.end_time = newEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    const localISO = toLocalISOString(newEnd);
+                    next.end_date = localISO.split('T')[0];
+                    next.end_time = localISO.split('T')[1].substring(0, 5);
                 }
             }
             return next;
@@ -125,7 +129,7 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
                         />
                     </div>
 
-                    <div className="edit-time-container">
+                    <div className="edit-time-container attention-sparkle">
                         {/* START */}
                         <div className="edit-time-row-split">
                             <label>Start</label>

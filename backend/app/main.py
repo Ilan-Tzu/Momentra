@@ -15,10 +15,22 @@ import logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-# Initialize database - Commented out to use Alembic migrations
-# database.init_db()
+# Initialize database
+database.init_db()
 
 app = FastAPI(title="AI Calendar Backend")
+
+# CORS Middleware should be early
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Add rate limiter to app state
 app.state.limiter = limiter
@@ -41,17 +53,6 @@ app.add_middleware(
 
 if settings.ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(routes.router, prefix="/api/v1")
 

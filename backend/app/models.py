@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SqlEnum, ForeignKey, JSON, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SqlEnum, ForeignKey, JSON, Float, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -60,6 +60,7 @@ class Task(Base):
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
     description = Column(Text, nullable=True)
+    is_blocking = Column(Boolean, default=True)
     
     user = relationship("User", back_populates="tasks")
     source_job = relationship("Job", back_populates="tasks")
