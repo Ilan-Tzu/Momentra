@@ -11,6 +11,7 @@ class JobStatus(str, Enum):
 
 class JobCreate(BaseModel):
     raw_text: str
+    user_local_time: Optional[str] = None  # ISO format with timezone, e.g., "2026-01-19T10:00:00+02:00"
 
 class JobCandidateRead(BaseModel):
     id: int
@@ -27,6 +28,7 @@ class JobCandidateUpdate(BaseModel):
     description: Optional[str] = None
     command_type: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
+    ignore_conflicts: Optional[bool] = False
 
 class JobRead(BaseModel):
     id: int
@@ -42,6 +44,7 @@ class JobWithCandidates(JobRead):
 
 class JobAccept(BaseModel):
     selected_candidate_ids: List[int]
+    ignore_conflicts: Optional[bool] = False
 
 class TaskRead(BaseModel):
     id: int
@@ -58,6 +61,7 @@ class TaskUpdate(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     description: Optional[str] = None
+    ignore_conflicts: Optional[bool] = False
 
 class UserRead(BaseModel):
     id: int
@@ -72,6 +76,9 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+
+class GoogleAuth(BaseModel):
+    id_token: str
 
 class JobExecuteResponse(BaseModel):
     job_id: int

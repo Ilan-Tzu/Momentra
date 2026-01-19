@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react';
+import { normalizeToUTC } from '../utils/dateUtils';
 import './CalendarStrip.css';
 
 const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -24,35 +25,31 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
         return dates;
     }, []);
 
-    // Scroll to today is essentially scroll to start now, so we can keep it or simplify.
-    // Since today is index 0, this will just ensure it's at start.
+    // Center the selected date and initialization
     useEffect(() => {
         if (scrollRef.current) {
-            const todayStr = new Date().toDateString();
-            const todayIndex = scrollableDates.findIndex(d => d.toDateString() === todayStr);
+            const selectedStr = selectedDate.toDateString();
+            const selectedIndex = scrollableDates.findIndex(d => d.toDateString() === selectedStr);
 
-            if (todayIndex !== -1) {
-                const todayElement = scrollRef.current.children[todayIndex];
-                if (todayElement) {
-                    todayElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+            if (selectedIndex !== -1) {
+                const selectedElement = scrollRef.current.children[selectedIndex];
+                if (selectedElement) {
+                    selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
                 }
             }
         }
-    }, [scrollableDates]);
+    }, [selectedDate, scrollableDates]);
 
-    // Enable horizontal scrolling with mouse wheel (keep this UX)
+    // Enable horizontal scrolling with mouse wheel
     useEffect(() => {
         const el = scrollRef.current;
         if (el) {
             const onWheel = (e) => {
                 if (e.deltaY === 0) return;
                 e.preventDefault();
-                el.scrollTo({
-                    left: el.scrollLeft + e.deltaY,
-                    behavior: 'smooth'
-                });
+                el.scrollLeft += e.deltaY;
             };
-            el.addEventListener('wheel', onWheel);
+            el.addEventListener('wheel', onWheel, { passive: false });
             return () => el.removeEventListener('wheel', onWheel);
         }
     }, []);
@@ -63,7 +60,9 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
         return tasks.filter(task => {
             if (!task.start_time) return false;
             try {
-                const t = new Date(task.start_time);
+                // Treat start_time as UTC (append Z if missing)
+                const st = normalizeToUTC(task.start_time);
+                const t = new Date(st);
                 return t.toDateString() === date.toDateString();
             } catch (e) { return false; }
         });

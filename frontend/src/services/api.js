@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const API_URL = 'http://127.0.0.1:8000/api/v1';
 
@@ -17,9 +18,32 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const message = error.response?.data?.detail || error.response?.data?.error || error.message || "An unexpected error occurred";
+
+        // Don't toast 409 Conflict errors as they are handled by the UI modal
+        if (error.response?.status !== 409) {
+            toast.error(`Error: ${message}`);
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 export const jobService = {
     createJob: async (rawText) => {
-        const response = await api.post('/jobs', { raw_text: rawText });
+        // Include user's local time with timezone for accurate parsing
+        const userLocalTime = new Date().toISOString().replace('Z', '') +
+            (new Date().getTimezoneOffset() > 0 ? '-' : '+') +
+            String(Math.abs(Math.floor(new Date().getTimezoneOffset() / 60))).padStart(2, '0') + ':' +
+            String(Math.abs(new Date().getTimezoneOffset() % 60)).padStart(2, '0');
+
+        const response = await api.post('/jobs', {
+            raw_text: rawText,
+            user_local_time: userLocalTime
+        });
         return response.data;
     },
 
@@ -33,8 +57,9 @@ export const jobService = {
         return response.data;
     },
 
-    acceptJob: async (jobId, candidateIds) => {
-        const response = await api.post(`/jobs/${jobId}/accept`, { selected_candidate_ids: candidateIds });
+    acceptJob: async (jobId, data) => {
+        const payload = Array.isArray(data) ? { selected_candidate_ids: data } : data;
+        const response = await api.post(`/jobs/${jobId}/accept`, payload);
         return response.data;
     },
 
@@ -48,13 +73,8 @@ export const jobService = {
         return true;
     },
 
-    register: async (username, password) => {
-        const response = await api.post('/auth/register', { username, password });
-        return response.data;
-    },
-
-    login: async (username, password) => {
-        const response = await api.post('/auth/login', { username, password });
+    googleLogin: async (idToken) => {
+        const response = await api.post('/auth/google', { id_token: idToken });
         return response.data;
     },
 

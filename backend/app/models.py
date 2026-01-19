@@ -13,7 +13,9 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # Nullable for Google OAuth users
+    email = Column(String, unique=True, index=True, nullable=True)  # Google email
+    google_sub = Column(String, unique=True, index=True, nullable=True)  # Google subject ID
     
     jobs = relationship("Job", back_populates="user")
     tasks = relationship("Task", back_populates="user")
@@ -24,6 +26,7 @@ class Job(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # made nullable for migration ease/backward compat, but logically should be required later
     raw_text = Column(Text, nullable=False)
+    user_local_time = Column(String, nullable=True)  # ISO format with timezone for LLM context
     status = Column(SqlEnum(JobStatus), default=JobStatus.CREATED)
     created_at = Column(DateTime, default=datetime.utcnow)
     

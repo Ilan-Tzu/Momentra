@@ -1,0 +1,73 @@
+/* Navigation Bar */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(15, 5, 30, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+    z-index: 5000;
+}
+
+.navbar-brand {
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: -0.02em;
+}
+
+.navbar-links {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-link {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.nav-link:hover {
+    color: white;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.nav-link.active {
+    color: white;
+    background: rgba(139, 92, 246, 0.25);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.nav-logout {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #FCA5A5;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.nav-logout:hover {
+    background: rgba(239, 68, 68, 0.25);
+    color: #FECACA;
+}

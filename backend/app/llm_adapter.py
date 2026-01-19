@@ -57,9 +57,10 @@ class AIParseResult(BaseModel):
 from datetime import datetime
 
 class LLMAdapter:
-    def parse_text(self, text: str, user_timezone: str = "UTC") -> dict:
+    def parse_text(self, text: str, user_local_time: str = None) -> dict:
         """
         Sends text to OpenAI and enforces a strict JSON schema return.
+        user_local_time: ISO format with timezone, e.g., "2026-01-19T10:00:00+02:00"
         """
         # --- MOCK/FALLBACK IF NO KEY ---
         if not client.api_key or client.api_key == "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx":
@@ -77,54 +78,101 @@ class LLMAdapter:
                  "ambiguities": []
              }
              
-        # Calculate current time dynamically
-        current_dt = datetime.now()
-        current_date_str = current_dt.strftime("%Y-%m-%d (%A)")
+        # Parse user's local time if provided, otherwise use server time
+        if user_local_time:
+            try:
+                from datetime import datetime
+                from dateutil import parser as date_parser
+                user_dt = date_parser.isoparse(user_local_time)
+                current_date_str = user_dt.strftime("%Y-%m-%d (%A)")
+                current_time_str = user_dt.strftime("%H:%M")
+                timezone_offset = user_dt.strftime("%z")  # e.g., "+0200"
+                timezone_info = f"UTC{timezone_offset[:3]}:{timezone_offset[3:]}" if timezone_offset else "UTC"
+            except:
+                current_dt = datetime.now()
+                current_date_str = current_dt.strftime("%Y-%m-%d (%A)")
+                current_time_str = current_dt.strftime("%H:%M")
+                timezone_info = "UTC (assumed)"
+                user_dt = current_dt
+        else:
+            current_dt = datetime.now()
+            current_date_str = current_dt.strftime("%Y-%m-%d (%A)")
+            current_time_str = current_dt.strftime("%H:%M")
+            timezone_info = "UTC (assumed)"
+            user_dt = current_dt
         
-        # Generator next 7 days context to help LLM resolve "Friday", "Next Tuesday" etc.
+        # Generate next 7 days context to help LLM resolve "Friday", "Next Tuesday" etc.
         from datetime import timedelta
         upcoming_days_context = "\n".join([
-            (current_dt + timedelta(days=i)).strftime(f"          - +{i} days: %Y-%m-%d (%A)")
+            (user_dt + timedelta(days=i)).strftime(f"          - +{i} days: %Y-%m-%d (%A)")
             for i in range(8)
         ])
              
         system_prompt = f"""
         You are an AI Calendar Assistant. 
-        Current Time (Context): {current_date_str}.
-        User Timezone: {user_timezone}.
+        
+        CURRENT USER CONTEXT:
+        - User's Local Date: {current_date_str}
+        - User's Local Time: {current_time_str}
+        - User's Timezone: {timezone_info}
+        
+        CRITICAL: ALL TIMES YOU OUTPUT MUST BE IN UTC (with 'Z' suffix).
+        When user says "4pm", convert it to UTC based on their timezone.
+        Example: If user is in UTC+2 and says "4pm", output "2026-01-19T14:00:00Z" (4pm local = 2pm UTC).
         
         Upcoming Days Reference:
 {upcoming_days_context}
 
         
-        Step 1: Analyze the input in the 'reasoning' field. explicitely state what is vague.
+        Step 1: Analyze the input in the 'reasoning' field. Explicitly state what is vague.
         Step 2: Extract tasks, calendar commands, and ambiguities.
+        Step 3: CONVERT ALL TIMES TO UTC before outputting.
         
         Rules for Ambiguity:
-          1. If time is clearly specified (e.g. "10am", "10 PM", "15:00"), extract it directly.
-          2. ONLY determine Ambiguity if AM/PM is missing AND context doesn't clarify (e.g. "at 8").
-          3. When generating an Ambiguity:
+          1. If time is in 24-hour format (e.g. "15", "15:00", "13", "22"), it is UNAMBIGUOUS - extract directly:
+             - Numbers 13-23 are ALWAYS PM (13=1pm, 15=3pm, 22=10pm)
+             - Numbers 0-12 without AM/PM may need clarification IF context doesn't help
+          2. If time has AM/PM specified (e.g. "10am", "10 PM"), extract it directly - NO ambiguity.
+          3. Smart Context Inference (Do this BEFORE flagging ambiguity):
+             - "Breakfast", "Morning", "Wake up" -> AM (e.g. "Breakfast at 8" = 8 AM)
+             - "Dinner", "Evening", "Night", "Party", "Drinks" -> PM (e.g. "Dinner at 8" = 8 PM)
+             - "Lunch" -> PM (12pm-2pm)
+             - "Work" -> AM (start) or PM (end) depending on typical hours, default to 9am start if vague.
+             - "Gym", "Workout" -> Ambiguous if not specified, unless "morning workout" etc.
+             
+             CRITICAL: If you infer AM/PM from these context words, the time is considered UNAMBIGUOUS.
+             create a TASK for it immediately. Do NOT create an Ambiguity.
+
+          4. ONLY create Ambiguity if:
+             - Time is 1-12 without AM/PM AND context provides NO clues (e.g. "Call Bob at 4").
+             - Do NOT create ambiguity for scheduling conflicts - that is handled separately by the system
+          5. When generating an Ambiguity:
+             - CRITICAL: The 'title' field must be the ACTUAL TASK NAME (e.g. "Dentist Appointment", "Meeting with Bob"). 
+             - Do NOT use generic titles like "Meeting Time?" or "Ambiguity".
+             - The title should describe WHAT the event is, not WHAT is ambiguous.
              - Provide logical options (e.g. 8 AM vs 8 PM).
-             - The 'value' must be a valid JSON string for Task parameters.
-             - Generate a SHORT Title for the ambiguity (e.g. "Meeting Time?").
-          
-          4. Convert relative dates (tomorrow, next monday, friday) to ISO timestamps using Current Time context.
-          
+             - The 'value' in each option must INCLUDE the 'title' field with the same task name.
+             - Generate a helpful 'message' asking the user to clarify the time.
+             - ALL TIMES IN OPTIONS MUST BE UTC (with 'Z' suffix).
+             
+          6. Convert relative dates (tomorrow, next monday, friday) to ISO timestamps using Current Date context.
+           
         - IMPORTANT: If user says a weekday (e.g. "Friday") and today is Sunday, it means the UPCOMING Friday (not past).
-        - Current Date is {current_date_str}. "Friday" should be calculated relative to THIS date.
+        - User's Current Date is {current_date_str}. "Friday" should be calculated relative to THIS date.
+        - REMEMBER: Output all times in UTC with 'Z' suffix!
         
-        Example JSON Output:
+        Example JSON Output (Ambiguity Case, times in UTC):
         {{
-          "reasoning": "User said 'at 8' without AM/PM. Conflicting.",
+          "reasoning": "User said 'dentist at 8' without AM/PM. Time is ambiguous. User is in UTC+2.",
           "tasks": [],
           "ambiguities": [
             {{
-                "title": "Meeting Time?",
+                "title": "Dentist Appointment",
                 "type": "unclear_time", 
-                "message": "Did you mean 8 AM or 8 PM?",
+                "message": "Is your dentist appointment at 8 AM or 8 PM?",
                 "options": [
-                    {{"label": "8 AM", "value": "{{\\"start_time\\": \\"2026-01-17T08:00:00\\", \\"end_time\\": \\"2026-01-17T09:00:00\\"}}"}},
-                    {{"label": "8 PM", "value": "{{\\"start_time\\": \\"2026-01-17T20:00:00\\", \\"end_time\\": \\"2026-01-17T21:00:00\\"}}"}}
+                    {{"label": "8 AM", "value": "{{\\"title\\": \\"Dentist Appointment\\", \\"start_time\\": \\"2026-01-17T06:00:00Z\\", \\"end_time\\": \\"2026-01-17T07:00:00Z\\"}}"}}
+                    {{"label": "8 PM", "value": "{{\\"title\\": \\"Dentist Appointment\\", \\"start_time\\": \\"2026-01-17T18:00:00Z\\", \\"end_time\\": \\"2026-01-17T19:00:00Z\\"}}"}}
                 ]
             }}
           ],

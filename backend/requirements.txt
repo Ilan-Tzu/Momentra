@@ -5,3 +5,5 @@ pydantic
 openai
 python-dotenv
 httpx
+psycopg2-binary
+alembic

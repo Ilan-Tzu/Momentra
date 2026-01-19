@@ -14,7 +14,6 @@
 /* Custom Scrollbar for Webkit */
 .calendar-strip::-webkit-scrollbar {
     height: 6px;
-    /* Sleek functional scrollbar */
     display: block;
 }
 

@@ -2,19 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { jobService } from './services/api'
 import CalendarStrip from './components/CalendarStrip'
 import ConfirmModal from './components/ConfirmModal'
+import Navbar from './components/Navbar'
+import LoginPage from './components/LoginPage'
 import './App.css'
-import { LogOut } from 'lucide-react'
 
-// Helper to get local ISO string (e.g. "2026-01-18T14:00:00") ignoring timezone offset
-const toLocalISOString = (date) => {
-  const pad = (num) => String(num).padStart(2, '0');
-  return date.getFullYear() +
-    '-' + pad(date.getMonth() + 1) +
-    '-' + pad(date.getDate()) +
-    'T' + pad(date.getHours()) +
-    ':' + pad(date.getMinutes()) +
-    ':' + pad(date.getSeconds());
-};
+import { formatToLocalTime, toLocalISOString, toUTC, normalizeToUTC } from './utils/dateUtils'
 
 function App() {
   const [status, setStatus] = useState('input') // input, loading, preview, success, error
@@ -47,6 +39,18 @@ function App() {
   // Toast state
   const [showToast, setShowToast] = useState(false)
 
+  // Navigation state
+  const [activePage, setActivePage] = useState('create') // 'create' | 'templates' | 'preferences'
+
+  // Conflict Resolution Modal State
+  const [conflictModal, setConflictModal] = useState({
+    isOpen: false,
+    newTask: null,      // { title, start_time, end_time, candidateId }
+    existingTask: null, // { id, title, start_time, end_time }
+    newTaskTime: '',
+    existingTaskTime: ''
+  })
+
   useEffect(() => {
     if (user) {
       fetchCalendarTasks();
@@ -59,6 +63,19 @@ function App() {
     }
   }, [candidates, status])
 
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (status === 'preview') {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [status])
 
 
   const handleLogout = () => {
@@ -77,7 +94,13 @@ function App() {
 
       const tasks = await jobService.getTasks(start.toISOString(), end.toISOString());
       console.log("Fetched calendar tasks:", tasks.length, tasks);
-      setCalendarTasks(tasks);
+      // Normalize times from backend (UTC naive -> UTC Z)
+      const normalized = tasks.map(t => ({
+        ...t,
+        start_time: normalizeToUTC(t.start_time),
+        end_time: normalizeToUTC(t.end_time)
+      }));
+      setCalendarTasks(normalized);
     } catch (e) {
       console.error("Failed to fetch tasks", e);
     }
@@ -146,9 +169,36 @@ function App() {
 
   const refreshPreview = async (id) => {
     const preview = await jobService.getJob(id);
-    setCandidates(preview.candidates);
+
+    // Normalize Candidates: Treat Naive LLM output as LOCAL -> Convert to UTC
+    const normalizedCandidates = preview.candidates.map(c => {
+      const p = { ...c.parameters };
+      if (p.start_time) p.start_time = normalizeToUTC(p.start_time);
+      if (p.end_time) p.end_time = normalizeToUTC(p.end_time);
+      return { ...c, parameters: p };
+    });
+
+    setCandidates(normalizedCandidates);
     setStatus('preview');
   }
+
+  const finalizeAcceptance = async (candidateId, force = false) => {
+    try {
+      await jobService.acceptJob(jobId, {
+        selected_candidate_ids: [candidateId],
+        ignore_conflicts: force
+      });
+      await jobService.deleteJobCandidate(candidateId);
+      setCandidates(prev => prev.filter(c => c.id !== candidateId));
+      await fetchCalendarTasks();
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (e) {
+      console.error("Auto-accept failed", e);
+      // Fallback: stay in preview
+      await refreshPreview(jobId);
+    }
+  };
 
   const handleAccept = async () => {
     if (!jobId) return;
@@ -169,9 +219,25 @@ function App() {
 
   const startEditing = (candidate) => {
     setEditingId(candidate.id);
+    const params = { ...candidate.parameters };
+
+    // Convert stored UTC times to Local ISO for input fields (datetime-local expects YYYY-MM-DDTHH:mm)
+    // Convert stored UTC times to Local ISO for input fields (datetime-local expects YYYY-MM-DDTHH:mm)
+    try {
+      if (params.start_time) {
+        // Treat start_time as UTC (normalizeToUTC appends Z if needed)
+        params.start_time = toLocalISOString(normalizeToUTC(params.start_time));
+      }
+      if (params.end_time) {
+        params.end_time = toLocalISOString(normalizeToUTC(params.end_time));
+      }
+    } catch (e) {
+      console.error("Failed to parse dates for editing", e);
+    }
+
     setEditForm({
       description: candidate.description,
-      parameters: { ...candidate.parameters }
+      parameters: params
     });
   }
 
@@ -182,13 +248,23 @@ function App() {
 
   const saveEditing = async () => {
     try {
-      await jobService.updateJobCandidate(editingId, {
+      const updated = await jobService.updateJobCandidate(editingId, {
         description: editForm.description,
         command_type: 'CREATE_TASK', // Ensure it converts to task
-        parameters: editForm.parameters
+        parameters: {
+          ...editForm.parameters,
+          // Convert local input value (YYYY-MM-DDTHH:mm) to UTC ISO string
+          start_time: toUTC(editForm.parameters.start_time),
+          end_time: toUTC(editForm.parameters.end_time)
+        }
       });
-      await refreshPreview(jobId);
+
       setEditingId(null);
+      if (updated.command_type !== 'AMBIGUITY') {
+        await finalizeAcceptance(editingId);
+      } else {
+        await refreshPreview(jobId);
+      }
     } catch (err) {
       console.error("Failed to update candidate", err);
     }
@@ -197,12 +273,49 @@ function App() {
   const updateEditField = (field, value) => {
     if (field === 'description') {
       setEditForm(prev => ({ ...prev, description: value }));
-    } else {
-      setEditForm(prev => ({
-        ...prev,
-        parameters: { ...prev.parameters, [field]: value }
-      }));
+      return;
     }
+
+    setEditForm(prev => {
+      let params = { ...prev.parameters, [field]: value };
+
+      // Auto-update end_time if start_time changes to preserve duration
+      if (field === 'start_time' && prev.parameters.start_time && prev.parameters.end_time) {
+        try {
+          const oldStart = new Date(prev.parameters.start_time);
+          const oldEnd = new Date(prev.parameters.end_time);
+          const newStart = new Date(value);
+
+          if (!isNaN(oldStart) && !isNaN(oldEnd) && !isNaN(newStart)) {
+            const duration = oldEnd - oldStart;
+            const newEnd = new Date(newStart.getTime() + duration);
+            // newEnd to ISO string (local time ISO without Z, or just use value format)
+            // datetime-local input gives YYYY-MM-DDTHH:mm
+            // We need to store it in a format compatible with our backend (ISO)
+            // But value is just the input string.
+            // Let's construct the ISO string carefully.
+            // Actually, simply keeping it as Date object and converting to ISO for storage?
+            // "paramaters" usually stores strings from backend.
+            // To be safe, let's use toISOString() but strip Z? 
+            // Or better, let's look at how backend parses. It accepts ISO.
+            // But datetime-local value is YYYY-MM-DDTHH:mm. 
+            // Let's output that format for the end_time field.
+
+            // Helper to format for datetime-local
+            const toLocalIso = (d) => {
+              const offset = d.getTimezoneOffset() * 60000;
+              return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+            };
+
+            params.end_time = toLocalIso(newEnd); // This matches the input value format
+          }
+        } catch (e) {
+          console.error("Auto-date error", e);
+        }
+      }
+
+      return { ...prev, parameters: params };
+    });
   }
 
   const reset = () => {
@@ -229,9 +342,17 @@ function App() {
   // Task Management Handlers
   const startTaskEdit = (task) => {
     setTaskEditingId(task.id);
+
+    const startDate = new Date(normalizeToUTC(task.start_time));
+    const endDate = new Date(normalizeToUTC(task.end_time));
+
+    const duration = endDate - startDate;
+
     setTaskEditForm({
       title: task.title,
-      start_time: task.start_time
+      start_time: toLocalISOString(startDate),
+      end_time: toLocalISOString(endDate),
+      duration: duration
     });
   }
 
@@ -242,11 +363,53 @@ function App() {
 
   const saveTaskEdit = async () => {
     try {
-      await jobService.updateTask(taskEditingId, taskEditForm);
+      await jobService.updateTask(taskEditingId, {
+        title: taskEditForm.title,
+        start_time: toUTC(taskEditForm.start_time),
+        end_time: toUTC(taskEditForm.end_time)
+      });
       await fetchCalendarTasks();
       setTaskEditingId(null);
     } catch (e) {
       console.error("Failed to update task", e);
+      if (e.response?.status === 409) {
+        let conflict = e.response.data.detail;
+        console.log("Conflict response:", conflict);
+
+        // Robust parsing: handle if conflict is a string (e.g. raw JSON or prefixed)
+        if (typeof conflict === 'string') {
+          try {
+            if (conflict.startsWith('CONFLICT:')) {
+              conflict = JSON.parse(conflict.replace('CONFLICT:', ''));
+            } else {
+              conflict = JSON.parse(conflict);
+            }
+          } catch (pErr) {
+            console.error("Failed to parse conflict string", pErr);
+          }
+        }
+
+        // Prepare existing task start time (Treat Naive as UTC)
+        let existingStart = normalizeToUTC(conflict?.start_time);
+
+        setConflictModal({
+          isOpen: true,
+          newTask: {
+            id: taskEditingId,
+            title: taskEditForm.title,
+            start_time: taskEditForm.start_time, // This is Local ISO from input
+            end_time: null // Edit form only has start_time currently
+          },
+          existingTask: {
+            id: conflict?.id,
+            title: conflict?.title,
+            start_time: existingStart,
+            end_time: conflict?.end_time
+          },
+          newTaskTime: formatToLocalTime(taskEditForm.start_time),
+          existingTaskTime: formatToLocalTime(existingStart)
+        });
+      }
     }
   }
 
@@ -276,106 +439,174 @@ function App() {
       tDate.getMonth() === selectedDate.getMonth() &&
       tDate.getFullYear() === selectedDate.getFullYear();
   });
-
-  // Auth state
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-  const [authUsername, setAuthUsername] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    console.log("Auth submit triggered", authMode, authUsername);
-    setAuthError('');
-    if (!authUsername.trim() || !authPassword.trim()) {
-      setAuthError('Please fill in all fields');
-      return;
-    }
-
-    setIsAuthLoading(true);
-    try {
-      if (authMode === 'register') {
-        await jobService.register(authUsername, authPassword);
-        // Auto login after register
-        await performLogin(authUsername, authPassword);
-      } else {
-        await performLogin(authUsername, authPassword);
-      }
-    } catch (err) {
-      console.error(err);
-      setAuthError(authMode === 'register' ? 'Registration failed. Username may be taken.' : 'Login failed. Check credentials.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  }
-
-  const performLogin = async (u, p) => {
-    const userData = await jobService.login(u, p);
-    localStorage.setItem('momentra_user', userData.username);
-    setUser(userData.username);
-  }
-
+  // Render login page if not authenticated
   if (!user) {
-    return (
-      <div className="login-container">
-        <div className="login-card">
-          <h1>Welcome to Momentra</h1>
-          <p>{authMode === 'login' ? 'Login to manage your calendar' : 'Create an account to get started'}</p>
+    return <LoginPage onLogin={(username) => setUser(username)} />
+  }
+  const handleSaveConflict = async (force = false) => {
+    try {
+      // 1. Update existing task time if changed
+      if (conflictModal.existingTask) {
+        const existingDate = new Date(normalizeToUTC(conflictModal.existingTask.start_time));
+        const [hours, mins] = conflictModal.existingTaskTime.split(':');
+        const targetHours = parseInt(hours);
+        const targetMins = parseInt(mins);
 
-          <form onSubmit={handleAuthSubmit}>
-            <input
-              className="login-input"
-              placeholder="Username"
-              value={authUsername}
-              onChange={e => setAuthUsername(e.target.value)}
-              autoFocus
-              disabled={isAuthLoading}
-            />
-            <input
-              className="login-input"
-              placeholder="Password"
-              type="password"
-              value={authPassword}
-              onChange={e => setAuthPassword(e.target.value)}
-              disabled={isAuthLoading}
-            />
+        // Only update if time actually changed
+        if (existingDate.getHours() !== targetHours || existingDate.getMinutes() !== targetMins) {
+          existingDate.setHours(targetHours, targetMins);
 
-            {authError && <p className="error-msg" style={{ marginBottom: '16px' }}>{authError}</p>}
+          try {
+            await jobService.updateTask(conflictModal.existingTask.id, {
+              start_time: existingDate.toISOString(),
+              ignore_conflicts: force
+            });
+          } catch (err) {
+            if (err.response?.status === 409) {
+              let secondaryConflict = err.response.data.detail;
+              if (typeof secondaryConflict === 'string') {
+                try {
+                  if (secondaryConflict.startsWith('CONFLICT:')) {
+                    secondaryConflict = JSON.parse(secondaryConflict.replace('CONFLICT:', ''));
+                  } else {
+                    secondaryConflict = JSON.parse(secondaryConflict);
+                  }
+                } catch (pErr) { console.error(pErr); }
+              }
+              let existingStart = normalizeToUTC(secondaryConflict?.start_time);
 
-            <button type="submit" className="login-btn" disabled={isAuthLoading}>
-              {isAuthLoading ? 'Processing...' : (authMode === 'login' ? 'Login' : 'Register')}
-            </button>
-          </form>
+              setConflictModal(prev => ({
+                ...prev,
+                showForceSave: true,
+                existingTask: {
+                  id: secondaryConflict?.id,
+                  title: secondaryConflict?.title,
+                  start_time: existingStart,
+                  end_time: secondaryConflict?.end_time
+                },
+                newTaskTime: prev.newTaskTime,
+                existingTaskTime: formatToLocalTime(existingStart)
+              }));
+              return;
+            }
+            throw err;
+          }
+        } else {
+          console.log("Existing task time unchanged, skipping update.");
+        }
+      }
 
-          <div style={{ marginTop: '20px' }}>
-            <button
-              type="button"
-              className="login-toggle-btn"
-              onClick={() => {
-                setAuthMode(authMode === 'login' ? 'register' : 'login');
-                setAuthError('');
-              }}
-            >
-              {authMode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+      // 2. Update new task (either candidate OR existing task)
+      const newDate = new Date(normalizeToUTC(conflictModal.newTask.start_time));
+      const [newHours, newMins] = conflictModal.newTaskTime.split(':');
+      newDate.setHours(parseInt(newHours), parseInt(newMins));
+
+      let newEndDate = null;
+      if (conflictModal.newTask.start_time && conflictModal.newTask.end_time) {
+        const originalStart = new Date(normalizeToUTC(conflictModal.newTask.start_time));
+        const originalEnd = new Date(normalizeToUTC(conflictModal.newTask.end_time));
+        const duration = originalEnd - originalStart;
+        newEndDate = new Date(newDate.getTime() + duration);
+      }
+
+      if (conflictModal.newTask.candidateId) {
+        // It's a CANDIDATE
+        const updatedCandidate = await jobService.updateJobCandidate(conflictModal.newTask.candidateId, {
+          parameters: {
+            title: conflictModal.newTask.title,
+            start_time: toUTC(newDate.toISOString()),
+            end_time: newEndDate ? toUTC(newEndDate.toISOString()) : null
+          },
+          command_type: 'CREATE_TASK',
+          ignore_conflicts: force
+        });
+
+        // Check if AMBIGUITY returned logic? (From verified logic earlier)
+        // If we force, it shouldn't return AMBIGUITY.
+        // But if we don't force, AMBIGUITY leads to preview refresh.
+        // Wait, current logic for Candidates is: conflict -> AMBIGUITY (200).
+        // My previous patch made `routes.py` return 409 for conflicts in UPDATE.
+        // But `verify_conflict` script showed it returns 200 Ambiguity.
+        // Ah, `update_candidate` in `services.py` catches conflict and converts to AMBIGUITY.
+        // If `ignore_conflicts` is True, it skips conflict check, returns CREATE_TASK.
+        // So `updatedCandidate` will be CREATE_TASK.
+        // Then we call `finalizeAcceptance`.
+
+        if (updatedCandidate.command_type === 'AMBIGUITY' && !force) {
+          // Refresh preview to show conflict
+          await refreshPreview(jobId);
+          setConflictModal({ ...conflictModal, isOpen: false });
+          return;
+        }
+
+        await finalizeAcceptance(conflictModal.newTask.candidateId, force);
+      } else {
+        // It's an EXISTING TASK
+        await jobService.updateTask(conflictModal.newTask.id, {
+          start_time: toUTC(newDate.toISOString()),
+          end_time: newEndDate ? toUTC(newEndDate.toISOString()) : null,
+          ignore_conflicts: force
+        });
+        await fetchCalendarTasks();
+      }
+
+      setConflictModal({ ...conflictModal, isOpen: false });
+      setTaskEditingId(null);
+      setTaskEditForm({});
+      if (jobId) await refreshPreview(jobId);
+      // setShowToast(true); // Assuming setShowToast is defined elsewhere
+      // setTimeout(() => setShowToast(false), 3000); // Assuming setShowToast is defined elsewhere
+
+    } catch (err) {
+      // Suppress console error for 409 if not forced
+      if (err.response?.status !== 409) {
+        console.error("Conflict Save Failed", err);
+      }
+
+      if (!force && err.response?.status === 409) {
+        let secondaryConflict = err.response.data.detail;
+        if (typeof secondaryConflict === 'string') {
+          try {
+            if (secondaryConflict.startsWith('CONFLICT:')) {
+              secondaryConflict = JSON.parse(secondaryConflict.replace('CONFLICT:', ''));
+            } else {
+              secondaryConflict = JSON.parse(secondaryConflict);
+            }
+          } catch (pErr) { console.error(pErr); }
+        }
+        let existingStart = normalizeToUTC(secondaryConflict?.start_time);
+
+        setConflictModal(prev => ({
+          ...prev,
+          showForceSave: true, // SHOW BUTTON
+          existingTask: {
+            id: secondaryConflict?.id,
+            title: secondaryConflict?.title,
+            start_time: existingStart,
+            end_time: secondaryConflict?.end_time
+          },
+          newTaskTime: prev.newTaskTime,
+          existingTaskTime: safeTimeString(existingStart)
+        }));
+      }
+    }
   }
 
   return (
     <>
+      {/* Navigation Bar */}
+      <Navbar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        onLogout={handleLogout}
+      />
+
       <div className={`container ${status === 'preview' ? 'blur-bg' : ''}`}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-          <button className="logout-btn-header" onClick={handleLogout}>Logout ({user})</button>
-        </div>
 
         {/* Hero Section */}
         <div className="hero-section" style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1>Momentra Calendar</h1>
-          <p>Describe your events in natural language</p>
+          <p>Describe your events in your words</p>
         </div>
 
         {/* Home: Input Card */}
@@ -391,7 +622,7 @@ function App() {
                   handleParse();
                 }
               }}
-              placeholder="e.g., Team meeting tomorrow at 2pm, Dentist appointment next Monday..."
+              placeholder="e.g., Team meeting tomorrow at 2pm, then dinner at 6pm and a Dentist appointment next Monday..."
               rows={3}
               style={{ margin: 0 }} /* Remove margin since wrapper handles gap */
             />
@@ -426,7 +657,7 @@ function App() {
 
         {/* Home: Calendar Dashboard Card */}
         <div className="calendar-dashboard-card">
-          <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>Upcoming</h2>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>Upcoming Events</h2>
           <CalendarStrip
             tasks={calendarTasks}
             selectedDate={selectedDate}
@@ -450,7 +681,7 @@ function App() {
                     <input
                       type="time"
                       className="edit-field-mini"
-                      value={taskEditForm.start_time ? new Date(taskEditForm.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      value={formatToLocalTime(taskEditForm.start_time)}
                       onChange={e => {
                         if (!e.target.value) return;
 
@@ -468,7 +699,16 @@ function App() {
                         // 4. Convert to LOCAL ISO string (preserving e.g. 14:00 as 14:00) using helper
                         const localIso = toLocalISOString(originalDate);
 
-                        setTaskEditForm(prev => ({ ...prev, start_time: localIso }));
+                        // Recalculate end_time to preserve duration
+                        const newStartMs = originalDate.getTime();
+                        const newEndMs = newStartMs + (taskEditForm.duration || 1800000); // Default 30m
+                        const newEndIso = toLocalISOString(new Date(newEndMs));
+
+                        setTaskEditForm(prev => ({
+                          ...prev,
+                          start_time: localIso,
+                          end_time: newEndIso
+                        }));
                       }}
                     />
                     <input
@@ -485,7 +725,7 @@ function App() {
                 ) : (
                   <>
                     <span className="task-time">
-                      {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      {formatToLocalTime(normalizeToUTC(task.start_time))}
                     </span>
                     <span className="task-title" style={{ flex: 1 }}>{task.title}</span>
                     <div className="task-actions">
@@ -531,6 +771,11 @@ function App() {
                             value={editForm.parameters.start_time?.slice(0, 16) || ''}
                             onChange={e => updateEditField('start_time', e.target.value)}
                           />
+                          <span className="time-sep">-</span>
+                          <input type="datetime-local" className="edit-field"
+                            value={editForm.parameters.end_time?.slice(0, 16) || ''}
+                            onChange={e => updateEditField('end_time', e.target.value)}
+                          />
                         </div>
                       )}
                       <div className="edit-buttons">
@@ -542,40 +787,133 @@ function App() {
                     <>
                       {candidate.command_type === 'AMBIGUITY' ? (
                         <div className="ambiguity-content">
-                          <h4>{candidate.parameters.message}</h4>
+                          <h4>
+                            {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
+                              ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time))}. What would you like to do?`
+                              : candidate.parameters.message}
+                          </h4>
                           <div className="ambiguity-opts">
                             {candidate.parameters.options?.map((opt, i) => (
-                              <button key={i} onClick={() => {
+                              <button key={i} onClick={async () => {
                                 let val = {};
                                 try { val = JSON.parse(opt.value) } catch (e) { }
-                                const newTitle = val.title || candidate.description.replace('Ambiguity: ', 'Task: ');
-                                jobService.updateJobCandidate(candidate.id, {
+
+                                // Handle conflict resolution options
+                                if (val.discard) {
+                                  // User chose to discard new task - just remove this candidate
+                                  await jobService.deleteJobCandidate(candidate.id);
+                                  await refreshPreview(jobId);
+                                  return;
+                                }
+
+                                // Handle "Keep both" option - open conflict modal
+                                if (val.keep_both) {
+                                  // Extract existing task info from the conflict message
+                                  // We need to get the existing task ID from the option that has remove_task_id
+                                  const replaceOption = candidate.parameters.options?.find(o => {
+                                    try {
+                                      const parsed = JSON.parse(o.value);
+                                      return parsed.remove_task_id;
+                                    } catch { return false; }
+                                  });
+                                  let existingTaskId = null;
+                                  if (replaceOption) {
+                                    try {
+                                      existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
+                                    } catch { }
+                                  }
+
+                                  // Fetch existing task details
+                                  const existingTask = calendarTasks.find(t => t.id === existingTaskId);
+
+                                  // Use the new task's start time for BOTH inputs (they conflict at this time)
+                                  // Fallback to candidate params if val doesn't have it (shouldn't happen but safe)
+                                  const rawTime = val.start_time || candidate.parameters.start_time;
+                                  const conflictTimeLocal = rawTime ? formatToLocalTime(normalizeToUTC(rawTime)) : '09:00';
+                                  setConflictModal({
+                                    isOpen: true,
+                                    newTask: {
+                                      title: val.title,
+                                      start_time: val.start_time,
+                                      end_time: val.end_time,
+                                      candidateId: candidate.id
+                                    },
+                                    existingTask: existingTask ? {
+                                      id: existingTask.id,
+                                      title: existingTask.title,
+                                      start_time: existingTask.start_time,
+                                      end_time: existingTask.end_time
+                                    } : null,
+                                    newTaskTime: conflictTimeLocal,
+                                    existingTaskTime: conflictTimeLocal // Both start at same time for manual adjustment
+                                  });
+                                  return;
+                                }
+
+
+                                if (val.remove_task_id) {
+                                  // User chose to replace - delete the existing task first
+                                  try {
+                                    await jobService.deleteTask(val.remove_task_id);
+                                  } catch (e) {
+                                    console.error("Failed to delete conflicting task", e);
+                                  }
+                                }
+
+                                // Convert to CREATE_TASK with the selected parameters
+                                const newTitle = val.title || candidate.description.replace('Conflict: ', '').replace('Ambiguity: ', '');
+                                const updated = await jobService.updateJobCandidate(candidate.id, {
                                   description: newTitle,
                                   command_type: 'CREATE_TASK',
-                                  parameters: { ...candidate.parameters, ...val }
-                                }).then(() => refreshPreview(jobId));
+                                  parameters: {
+                                    title: newTitle,
+                                    start_time: val.start_time,
+                                    end_time: val.end_time,
+                                    description: val.description
+                                  }
+                                });
+
+                                if (updated.command_type !== 'AMBIGUITY') {
+                                  await finalizeAcceptance(candidate.id);
+                                } else {
+                                  await refreshPreview(jobId);
+                                }
                               }}>{opt.label}</button>
                             ))}
                             <button className="other-opt-btn" onClick={() => {
-                              // Switch to edit mode, pre-fill with defaults if needed
-                              // We keep it as AMBIGUITY type until saved, but the edit form will show time inputs now (see above change)
-                              // Or we can auto-convert to CREATE_TASK here. Let's convert to CREATE_TASK to enable full editing.
+                              // Pre-fill with first option's time, or fallback to now
+                              let prefillStart = new Date();
+                              let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
+
+                              // Try to parse the first option
+                              if (candidate.parameters.options?.length > 0) {
+                                try {
+                                  const firstOpt = JSON.parse(candidate.parameters.options[0].value);
+                                  if (firstOpt.start_time) {
+                                    prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
+                                  }
+                                  if (firstOpt.title) {
+                                    prefillTitle = firstOpt.title;
+                                  }
+                                } catch (e) { console.error("Failed to parse first option", e); }
+                              }
+
+                              // Calculate end_time as 30 min after start
+                              const prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
+
+                              // Convert to CREATE_TASK and enter edit mode
                               jobService.updateJobCandidate(candidate.id, {
                                 command_type: 'CREATE_TASK',
-                                description: candidate.description.replace('Ambiguity: ', 'Task: ') // Clean up title
+                                description: prefillTitle
                               }).then(() => {
-                                // After update, refresh logic usually resets candidates, but here we want to EDIT.
-                                // We might need to handle this carefully. 
-                                // Actually standard startEditing works on the *local* candidate. 
-                                // Better: Just start editing locally. The saveEditing will send the update.
-                                // But we need to ensure the LOCAL form state has the right command_type so the input shows.
                                 setEditingId(candidate.id);
                                 setEditForm({
-                                  description: candidate.description.replace('Ambiguity: ', ''), // cleaner
+                                  description: prefillTitle,
                                   parameters: {
                                     ...candidate.parameters,
-                                    // Default to "tomorrow 9am" or similar if empty? Or just empty.
-                                    start_time: new Date().toISOString()
+                                    title: prefillTitle,
+                                    start_time: toLocalISOString(prefillStart),
+                                    end_time: toLocalISOString(prefillEnd)
                                   }
                                 });
                               });
@@ -586,29 +924,37 @@ function App() {
                         <div className="candidate-content">
                           <h3>{candidate.description}</h3>
                           <div className="candidate-meta">
-                            <span>📅 {candidate.parameters.start_time ? new Date(candidate.parameters.start_time).toLocaleDateString() : 'No date'}</span>
-                            <span>🕒 {candidate.parameters.start_time ? new Date(candidate.parameters.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            <span>📅 {candidate.parameters.start_time ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString() : 'No date'}</span>
+                            <span>🕒 {candidate.parameters.start_time ? (
+                              <>
+                                {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time))}
+                                {candidate.parameters.end_time && (
+                                  <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time))}</>
+                                )}
+                              </>
+                            ) : ''}</span>
                           </div>
                         </div>
                       )}
 
                       <div className="card-controls">
                         <button className="reject-btn" onClick={() => {
-                          if (confirm("Reject this event?")) jobService.deleteJobCandidate(candidate.id).then(() => refreshPreview(jobId));
+                          setConfirmModal({
+                            isOpen: true,
+                            title: 'Reject Event',
+                            message: 'Are you sure you want to reject this event?',
+                            isDestructive: true,
+                            onConfirm: async () => {
+                              await jobService.deleteJobCandidate(candidate.id);
+                              await refreshPreview(jobId);
+                              closeConfirm();
+                            }
+                          });
                         }}>Reject</button>
 
                         {candidate.command_type !== 'AMBIGUITY' && (
                           <>
-                            <button className="accept-btn" onClick={async () => {
-                              try {
-                                await jobService.acceptJob(jobId, [candidate.id]);
-                                await jobService.deleteJobCandidate(candidate.id); // Remove from candidate list
-                                setCandidates(prev => prev.filter(c => c.id !== candidate.id));
-                                await fetchCalendarTasks();
-                                setShowToast(true);
-                                setTimeout(() => setShowToast(false), 3000);
-                              } catch (e) { console.error(e); }
-                            }}>Accept</button>
+                            <button className="accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
                             <button className="edit-btn-neutral" onClick={() => startEditing(candidate)}>Edit</button>
                           </>
                         )}
@@ -620,7 +966,18 @@ function App() {
             </div>
 
             <div className="review-footer">
-              <button className="footer-reject" onClick={reset}>Reject All</button>
+              <button className="footer-reject" onClick={() => {
+                setConfirmModal({
+                  isOpen: true,
+                  title: 'Reject All Events',
+                  message: 'Are you sure you want to reject all these events? This action cannot be undone.',
+                  isDestructive: true,
+                  onConfirm: () => {
+                    reset();
+                    closeConfirm();
+                  }
+                });
+              }}>Reject All</button>
               <button className="footer-accept" onClick={handleAccept}>Accept All</button>
             </div>
           </div>
@@ -636,6 +993,104 @@ function App() {
           </div>
         )
       }
+
+      {/* Conflict Resolution Modal */}
+      {conflictModal.isOpen && (
+        <div className="review-overlay">
+          <div className="conflict-modal">
+            <div className="conflict-header">
+              <h2>Resolve Time Conflict</h2>
+              <button className="close-btn" onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}>×</button>
+            </div>
+            <p className="conflict-subtext">Adjust the times for these overlapping events:</p>
+
+            <div className="conflict-tasks">
+              {/* New Task */}
+              <div className="conflict-task-card new-task">
+                <div className="task-badge new">New</div>
+                <h4>{conflictModal.newTask?.title || 'New Task'}</h4>
+                <div className="time-input-group">
+                  <label>Time</label>
+                  <div className="time-control-group">
+                    <div className="arrow-stack">
+                      <button className="arrow-btn" onClick={() => {
+                        const [h, m] = conflictModal.newTaskTime.split(':').map(Number);
+                        const d = new Date(); d.setHours(h, m + 30);
+                        setConflictModal(prev => ({ ...prev, newTaskTime: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+                      }}>▲</button>
+                      <button className="arrow-btn" onClick={() => {
+                        const [h, m] = conflictModal.newTaskTime.split(':').map(Number);
+                        const d = new Date(); d.setHours(h, m - 30);
+                        setConflictModal(prev => ({ ...prev, newTaskTime: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+                      }}>▼</button>
+                    </div>
+                    <input
+                      className="time-input-styled"
+                      type="time"
+                      value={conflictModal.newTaskTime}
+                      onChange={(e) => setConflictModal({ ...conflictModal, newTaskTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Existing Task */}
+              {conflictModal.existingTask && (
+                <div className="conflict-task-card existing-task">
+                  <div className="task-badge existing">Existing</div>
+                  <h4>{conflictModal.existingTask?.title || 'Existing Task'}</h4>
+                  <div className="time-input-group">
+                    <label>Time</label>
+                    <div className="time-control-group">
+                      <div className="arrow-stack">
+                        <button className="arrow-btn" onClick={() => {
+                          const [h, m] = conflictModal.existingTaskTime.split(':').map(Number);
+                          const d = new Date(); d.setHours(h, m + 30);
+                          setConflictModal(prev => ({ ...prev, existingTaskTime: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+                        }}>▲</button>
+                        <button className="arrow-btn" onClick={() => {
+                          const [h, m] = conflictModal.existingTaskTime.split(':').map(Number);
+                          const d = new Date(); d.setHours(h, m - 30);
+                          setConflictModal(prev => ({ ...prev, existingTaskTime: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+                        }}>▼</button>
+                      </div>
+                      <input
+                        className="time-input-styled"
+                        type="time"
+                        value={conflictModal.existingTaskTime}
+                        onChange={(e) => setConflictModal({ ...conflictModal, existingTaskTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="conflict-actions">
+              <button
+                className="conflict-cancel"
+                onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}
+              >
+                Cancel
+              </button>
+              {conflictModal.showForceSave && (
+                <button
+                  className="conflict-save-anyway"
+                  style={{ backgroundColor: '#ff9800', marginRight: '10px' }}
+                  onClick={() => handleSaveConflict(true)}
+                >
+                  Save Anyway
+                </button>
+              )}
+              <button
+                className="conflict-save"
+                onClick={() => handleSaveConflict(false)}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmModal

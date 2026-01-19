@@ -1,0 +1,400 @@
+/* Login Page Styles */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: transparent;
+    z-index: 3000;
+    overflow: hidden;
+}
+
+/* Floating Calendar Blocks Background */
+.floating-blocks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.floating-block {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    border-radius: 16px;
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.1);
+    backdrop-filter: blur(8px);
+    opacity: 0.4;
+}
+
+.floating-block .block-day {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(216, 180, 254, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.floating-block .block-num {
+    font-size: 24px;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Position and animation variations - Unique fluid paths */
+.block-1 {
+    top: 8%;
+    left: -5%;
+    animation: driftDiagonalRight 45s linear infinite;
+}
+
+.block-2 {
+    top: 70%;
+    left: 3%;
+    animation: driftUp 50s linear infinite;
+    animation-delay: -15s;
+}
+
+.block-3 {
+    top: 12%;
+    right: -4%;
+    animation: driftDiagonalLeft 42s linear infinite;
+    animation-delay: -8s;
+}
+
+.block-4 {
+    top: 80%;
+    right: 8%;
+    animation: driftUp 55s linear infinite;
+    animation-delay: -25s;
+}
+
+.block-5 {
+    top: 40%;
+    left: 90%;
+    animation: driftDiagonalLeft 48s linear infinite;
+    animation-delay: -12s;
+}
+
+.block-6 {
+    top: 90%;
+    left: 35%;
+    animation: driftRight 52s linear infinite;
+    animation-delay: -20s;
+}
+
+.block-7 {
+    top: -8%;
+    left: 55%;
+    animation: driftDown 46s linear infinite;
+    animation-delay: -30s;
+}
+
+.block-8 {
+    top: 55%;
+    right: -10%;
+    animation: driftDiagonalRight 40s linear infinite;
+    animation-delay: -18s;
+}
+
+/* Fluid directional animations */
+@keyframes driftDiagonalRight {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+
+    25% {
+        transform: translate(80px, 40px) rotate(2deg);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: translate(160px, 80px) rotate(0deg);
+        opacity: 0.3;
+    }
+
+    75% {
+        transform: translate(80px, 40px) rotate(-2deg);
+        opacity: 0.45;
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+}
+
+@keyframes driftDiagonalLeft {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.3;
+    }
+
+    25% {
+        transform: translate(-70px, 50px) rotate(-2deg);
+        opacity: 0.45;
+    }
+
+    50% {
+        transform: translate(-140px, 100px) rotate(0deg);
+        opacity: 0.35;
+    }
+
+    75% {
+        transform: translate(-70px, 50px) rotate(2deg);
+        opacity: 0.4;
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.3;
+    }
+}
+
+@keyframes driftUp {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+
+    25% {
+        transform: translate(20px, -60px) rotate(1deg);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: translate(0, -120px) rotate(0deg);
+        opacity: 0.35;
+    }
+
+    75% {
+        transform: translate(-20px, -60px) rotate(-1deg);
+        opacity: 0.45;
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+}
+
+@keyframes driftDown {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.3;
+    }
+
+    25% {
+        transform: translate(-15px, 70px) rotate(-1deg);
+        opacity: 0.45;
+    }
+
+    50% {
+        transform: translate(0, 140px) rotate(0deg);
+        opacity: 0.3;
+    }
+
+    75% {
+        transform: translate(15px, 70px) rotate(1deg);
+        opacity: 0.4;
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.3;
+    }
+}
+
+@keyframes driftRight {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+
+    25% {
+        transform: translate(60px, -10px) rotate(1deg);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: translate(120px, 0) rotate(0deg);
+        opacity: 0.35;
+    }
+
+    75% {
+        transform: translate(60px, 10px) rotate(-1deg);
+        opacity: 0.45;
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.25;
+    }
+}
+
+/* Login Card */
+.login-card {
+    background: rgba(60, 20, 100, 0.25);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    padding: 40px;
+    border-radius: 32px;
+    border: 1px solid rgba(192, 132, 252, 0.15);
+    box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5);
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.login-card h1 {
+    font-size: 32px;
+    font-weight: 300;
+    margin: 0;
+    color: white;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 30px rgba(167, 139, 250, 0.3);
+}
+
+.login-card p {
+    color: rgba(233, 213, 255, 0.7);
+    margin: 0;
+    font-size: 15px;
+    font-weight: 300;
+}
+
+.login-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px 20px;
+    border-radius: 16px;
+    color: white;
+    font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-weight: 300;
+}
+
+.login-input:focus {
+    border-color: rgba(192, 132, 252, 0.5);
+    box-shadow: 0 0 0 4px rgba(192, 132, 252, 0.1);
+}
+
+.login-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.login-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #A855F7 0%, #7C3AED 100%);
+    color: white;
+    border: none;
+    padding: 16px;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-top: 12px;
+    box-shadow: 0 10px 20px -5px rgba(124, 58, 237, 0.4);
+}
+
+.login-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px -5px rgba(124, 58, 237, 0.5);
+}
+
+.login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.login-toggle-btn {
+    background: none;
+    border: none;
+    color: rgba(233, 213, 255, 0.7);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px;
+    margin-top: 8px;
+    transition: color 0.2s;
+    font-weight: 400;
+}
+
+.login-toggle-btn:hover {
+    color: white;
+}
+
+.error-msg {
+    color: #FCA5A5;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+/* Swipe Animations */
+.swipe-right {
+    animation: swipeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    width: 100%;
+}
+
+.swipe-left {
+    animation: swipeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    width: 100%;
+}
+
+@keyframes swipeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes swipeInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Google Login Wrapper */
+.google-login-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    min-height: 44px;
+}
+
+.loading-text {
+    color: rgba(233, 213, 255, 0.7);
+    font-size: 15px;
+    font-weight: 300;
+    margin: 0;
+}

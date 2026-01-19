@@ -26,6 +26,29 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return user
 
+@router.post("/auth/google")
+def google_login(auth_data: schemas.GoogleAuth, db: Session = Depends(get_db)):
+    """Authenticate user via Google OAuth."""
+    service = services.JobService(db)
+    try:
+        # Verify the Google token
+        google_info = service.verify_google_token(auth_data.id_token)
+        
+        # Get or create user
+        user = service.get_or_create_google_user(
+            google_sub=google_info['sub'],
+            email=google_info['email'],
+            name=google_info.get('name')
+        )
+        
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
 @router.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
     # Create a temporary file to save the upload
@@ -73,7 +96,7 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
 def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends(get_db)):
     service = services.JobService(db)
     try:
-        tasks = service.accept_candidates(job_id, accept_req.selected_candidate_ids)
+        tasks = service.accept_candidates(job_id, accept_req.selected_candidate_ids, ignore_conflicts=accept_req.ignore_conflicts)
         # Re-fetch job to get latest status
         job = service.get_job_details(job_id)
         return {
@@ -82,6 +105,14 @@ def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends
             "tasks_created": tasks
         }
     except ValueError as e:
+        if "CONFLICT:" in str(e):
+             import json
+             detail_str = str(e).split("CONFLICT:", 1)[1]
+             try:
+                detail_obj = json.loads(detail_str)
+                raise HTTPException(status_code=409, detail=detail_obj)
+             except:
+                raise HTTPException(status_code=409, detail=detail_str)
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.patch("/candidates/{candidate_id}", response_model=schemas.JobCandidateRead)
@@ -90,6 +121,14 @@ def update_candidate(candidate_id: int, candidate_update: schemas.JobCandidateUp
     try:
         return service.update_candidate(candidate_id, candidate_update)
     except ValueError as e:
+        if "CONFLICT:" in str(e):
+             import json
+             detail_str = str(e).split("CONFLICT:", 1)[1]
+             try:
+                detail_obj = json.loads(detail_str)
+                raise HTTPException(status_code=409, detail=detail_obj)
+             except:
+                raise HTTPException(status_code=409, detail=detail_str)
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.delete("/candidates/{candidate_id}", status_code=204)
@@ -114,8 +153,29 @@ def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Dep
     service = services.JobService(db)
     try:
         return service.update_task(task_id, task_update)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        msg = str(e)
+        # Check for conflict error
+        if "CONFLICT:" in msg:
+            import json
+            try:
+                # Extract JSON part after CONFLICT:
+                json_str = msg.split("CONFLICT:", 1)[1]
+                conflict_data = json.loads(json_str)
+                raise HTTPException(status_code=409, detail=conflict_data)
+            except Exception as parse_err:
+                print(f"Failed to parse conflict data: {parse_err}")
+                # If parsing fails, still return 409 but with raw message
+                raise HTTPException(status_code=409, detail=msg)
+        
+        # Log unexpected errors
+        print(f"ERROR in update_task: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        if isinstance(e, ValueError):
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int, db: Session = Depends(get_db)):
