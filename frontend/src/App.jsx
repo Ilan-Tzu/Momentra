@@ -9,6 +9,7 @@ import './App.css'
 import './mobile.css'
 
 import { formatToLocalTime, toLocalISOString, toUTC, normalizeToUTC, handleTimeShift } from './utils/dateUtils'
+import { getUser, clearTokens } from './utils/auth'
 
 function App() {
   const [status, setStatus] = useState('input') // input, loading, preview, success, error
@@ -18,7 +19,7 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('')
 
   // User state
-  const [user, setUser] = useState(localStorage.getItem('momentra_user') || '');
+  const [user, setUser] = useState(getUser()?.username || '');
 
 
   // Calendar State (Home Screen)
@@ -101,7 +102,7 @@ function App() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('momentra_user');
+    clearTokens();
     setUser('');
     setCalendarTasks([]);
   }

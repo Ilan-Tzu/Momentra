@@ -18,3 +18,5 @@ python-multipart
 python-dateutil
 google-auth
 bleach
+python-jose[cryptography]
+PyJWT

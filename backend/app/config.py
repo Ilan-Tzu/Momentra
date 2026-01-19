@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     # Google Auth (Required for login)
     GOOGLE_CLIENT_ID: str = ""
     
+    # JWT Configuration
+    JWT_SECRET_KEY: str = "your-secret-key-min-32-characters-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
+    
     model_config = SettingsConfigDict(
         # In production, we prefer environment variables over .env files
         env_file=".env" if ENVIRONMENT == "development" else None,

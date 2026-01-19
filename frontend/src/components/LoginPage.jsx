@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { jobService } from '../services/api'
+import { setTokens } from '../utils/auth'
 import './LoginPage.css'
 
 function LoginPage({ onLogin }) {
@@ -181,9 +182,13 @@ function LoginPage({ onLogin }) {
         setIsLoading(true)
 
         try {
-            const userData = await jobService.googleLogin(credentialResponse.credential)
-            localStorage.setItem('momentra_user', userData.email || userData.username)
-            onLogin(userData.email || userData.username)
+            const response = await jobService.googleLogin(credentialResponse.credential)
+
+            // Response now contains: { access_token, refresh_token, user: {id, username} }
+            setTokens(response.access_token, response.refresh_token, response.user)
+
+            // Call the onLogin callback with username
+            onLogin(response.user.username)
         } catch (err) {
             console.error('Google login failed:', err)
             setError('Google login failed. Please try again.')

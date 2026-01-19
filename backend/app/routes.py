@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -6,33 +6,55 @@ from datetime import datetime
 from . import schemas, services
 from .database import get_db
 from .rate_limit import limiter
+from .jwt_utils import create_access_token, create_refresh_token, verify_token
+from .auth_dependencies import get_current_user
+from .models import User
 import shutil
 import os
 import tempfile
 
 router = APIRouter()
 
-@router.post("/auth/register", response_model=schemas.UserRead)
+@router.post("/auth/register", response_model=schemas.Token)
 @limiter.limit("10/minute")
 def register_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     service = services.JobService(db)
     try:
-        return service.create_user(user.username, user.password)
+        new_user = service.create_user(user.username, user.password)
+        
+        # Generate JWT tokens
+        access_token = create_access_token(data={"sub": str(new_user.id)})
+        refresh_token = create_refresh_token(data={"sub": str(new_user.id)})
+        
+        return schemas.Token(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=schemas.UserRead(id=new_user.id, username=new_user.username)
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/auth/login", response_model=schemas.UserRead)
+@router.post("/auth/login", response_model=schemas.Token)
 @limiter.limit("10/minute")
 def login(request: Request, user_login: schemas.UserLogin, db: Session = Depends(get_db)):
     user = services.JobService(db).authenticate_user(user_login.username, user_login.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return user
+    
+    # Generate JWT tokens
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    
+    return schemas.Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=schemas.UserRead(id=user.id, username=user.username)
+    )
 
-@router.post("/auth/google")
+@router.post("/auth/google", response_model=schemas.Token)
 @limiter.limit("10/minute")
 def google_login(request: Request, auth_data: schemas.GoogleAuth, db: Session = Depends(get_db)):
-    """Authenticate user via Google OAuth."""
+    """Authenticate user via Google OAuth and return JWT tokens."""
     service = services.JobService(db)
     try:
         # Verify the Google token
@@ -45,17 +67,54 @@ def google_login(request: Request, auth_data: schemas.GoogleAuth, db: Session = 
             name=google_info.get('name')
         )
         
-        return {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email
-        }
+        # Generate JWT tokens
+        access_token = create_access_token(data={"sub": str(user.id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.id)})
+        
+        return schemas.Token(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=schemas.UserRead(id=user.id, username=user.username)
+        )
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+@router.post("/auth/refresh", response_model=schemas.TokenResponse)
+@limiter.limit("20/minute")
+def refresh_token_endpoint(request: Request, token_data: schemas.TokenRefresh, db: Session = Depends(get_db)):
+    """Refresh access token using a valid refresh token."""
+    # Verify refresh token
+    payload = verify_token(token_data.refresh_token, token_type="refresh")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Extract user ID
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # Verify user still exists
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    # Generate new access token
+    new_access_token = create_access_token(data={"sub": user_id})
+    
+    return schemas.TokenResponse(access_token=new_access_token)
+
 @router.post("/transcribe")
 @limiter.limit("20/minute")
-async def transcribe_audio(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def transcribe_audio(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Create a temporary file to save the upload
     with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
         shutil.copyfileobj(file.file, temp_file)
@@ -73,38 +132,35 @@ async def transcribe_audio(request: Request, file: UploadFile = File(...), db: S
             os.remove(temp_path)
 
 @router.post("/jobs", response_model=schemas.JobRead)
-def create_job(job: schemas.JobCreate, db: Session = Depends(get_db), x_user_id: str = Header(None)):
-    if not x_user_id:
-        raise HTTPException(status_code=400, detail="X-User-Id header required")
+def create_job(job: schemas.JobCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
-    user = service.get_or_create_user(x_user_id)
-    return service.create_job(job, user.id)
+    return service.create_job(job, current_user.id)
 
 @router.post("/jobs/{job_id}/parse", response_model=dict)
 @limiter.limit("20/minute")
-def parse_job(request: Request, job_id: int, db: Session = Depends(get_db)):
+def parse_job(request: Request, job_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        count = service.parse_job(job_id)
+        count = service.parse_job(job_id, current_user.id)
         return {"candidates_count": count}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/jobs/{job_id}", response_model=schemas.JobWithCandidates)
-def get_job(job_id: int, db: Session = Depends(get_db)):
+def get_job(job_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
-    job = service.get_job_details(job_id)
+    job = service.get_job_details(job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 @router.post("/jobs/{job_id}/accept", response_model=schemas.JobExecuteResponse)
-def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends(get_db)):
+def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        tasks = service.accept_candidates(job_id, accept_req.selected_candidate_ids, ignore_conflicts=accept_req.ignore_conflicts)
+        tasks = service.accept_candidates(job_id, accept_req.selected_candidate_ids, current_user.id, ignore_conflicts=accept_req.ignore_conflicts)
         # Re-fetch job to get latest status
-        job = service.get_job_details(job_id)
+        job = service.get_job_details(job_id, current_user.id)
         return {
             "job_id": job.id,
             "status": job.status,
@@ -122,10 +178,10 @@ def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.patch("/candidates/{candidate_id}", response_model=schemas.JobCandidateRead)
-def update_candidate(candidate_id: int, candidate_update: schemas.JobCandidateUpdate, db: Session = Depends(get_db)):
+def update_candidate(candidate_id: int, candidate_update: schemas.JobCandidateUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        return service.update_candidate(candidate_id, candidate_update)
+        return service.update_candidate(candidate_id, candidate_update, current_user.id)
     except ValueError as e:
         if "CONFLICT:" in str(e):
              import json
@@ -138,27 +194,24 @@ def update_candidate(candidate_id: int, candidate_update: schemas.JobCandidateUp
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.delete("/candidates/{candidate_id}", status_code=204)
-def delete_candidate(candidate_id: int, db: Session = Depends(get_db)):
+def delete_candidate(candidate_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        service.delete_candidate(candidate_id)
+        service.delete_candidate(candidate_id, current_user.id)
         return
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/tasks", response_model=List[schemas.TaskRead])
-def get_tasks(start_date: datetime, end_date: datetime, db: Session = Depends(get_db), x_user_id: str = Header(None)):
-    if not x_user_id:
-        raise HTTPException(status_code=400, detail="X-User-Id header required")
+def get_tasks(start_date: datetime, end_date: datetime, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
-    user = service.get_or_create_user(x_user_id)
-    return service.get_tasks(start_date, end_date, user.id)
+    return service.get_tasks(start_date, end_date, current_user.id)
 
 @router.patch("/tasks/{task_id}", response_model=schemas.TaskRead)
-def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
+def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        return service.update_task(task_id, task_update)
+        return service.update_task(task_id, task_update, current_user.id)
     except Exception as e:
         msg = str(e)
         # Check for conflict error
@@ -184,10 +237,10 @@ def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Dep
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
     try:
-        service.delete_task(task_id)
+        service.delete_task(task_id, current_user.id)
         return
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

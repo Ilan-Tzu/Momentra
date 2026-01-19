@@ -85,6 +85,7 @@ class JobService:
         except ValueError as e:
             raise ValueError(f"Invalid Google token: {str(e)}")
 
+
     def get_or_create_google_user(self, google_sub: str, email: str, name: str = None) -> User:
         """Find existing user by Google sub or email, or create a new one."""
         # First try to find by google_sub
@@ -133,8 +134,8 @@ class JobService:
         self.db.refresh(job)
         return job
 
-    def parse_job(self, job_id: int) -> int:
-        job = self.db.query(Job).filter(Job.id == job_id).first()
+    def parse_job(self, job_id: int, user_id: int) -> int:
+        job = self.db.query(Job).filter(Job.id == job_id, Job.user_id == user_id).first()
         if not job:
             raise ValueError("Job not found")
 
@@ -321,11 +322,11 @@ class JobService:
             ]
         }
 
-    def get_job_details(self, job_id: int) -> Optional[Job]:
-        return self.db.query(Job).filter(Job.id == job_id).first()
+    def get_job_details(self, job_id: int, user_id: int) -> Optional[Job]:
+        return self.db.query(Job).filter(Job.id == job_id, Job.user_id == user_id).first()
 
-    def accept_candidates(self, job_id: int, selected_ids: List[int], ignore_conflicts: bool = False) -> List[Task]:
-        job = self.db.query(Job).filter(Job.id == job_id).first()
+    def accept_candidates(self, job_id: int, selected_ids: List[int], user_id: int, ignore_conflicts: bool = False) -> List[Task]:
+        job = self.db.query(Job).filter(Job.id == job_id, Job.user_id == user_id).first()
         if not job:
             raise ValueError("Job not found")
 
@@ -401,8 +402,11 @@ class JobService:
             print(f"DEBUG _parse_datetime failed for '{dt_str}': {e}")
             return None
 
-    def update_candidate(self, candidate_id: int, update_data: JobCandidateUpdate) -> JobCandidate:
-        candidate = self.db.query(JobCandidate).filter(JobCandidate.id == candidate_id).first()
+    def update_candidate(self, candidate_id: int, update_data: JobCandidateUpdate, user_id: int) -> JobCandidate:
+        candidate = self.db.query(JobCandidate).join(Job).filter(
+            JobCandidate.id == candidate_id,
+            Job.user_id == user_id
+        ).first()
         if not candidate:
             raise ValueError("Candidate not found")
         
@@ -453,8 +457,11 @@ class JobService:
         print(f"DEBUG update_candidate: returning candidate type={candidate.command_type}")
         return candidate
 
-    def delete_candidate(self, candidate_id: int):
-        candidate = self.db.query(JobCandidate).filter(JobCandidate.id == candidate_id).first()
+    def delete_candidate(self, candidate_id: int, user_id: int):
+        candidate = self.db.query(JobCandidate).join(Job).filter(
+            JobCandidate.id == candidate_id,
+            Job.user_id == user_id
+        ).first()
         if not candidate:
             raise ValueError("Candidate not found")
         self.db.delete(candidate)
@@ -475,8 +482,8 @@ class JobService:
             return dt.astimezone(timezone.utc).replace(tzinfo=None)
         return dt
 
-    def update_task(self, task_id: int, update_data: TaskUpdate) -> Task:
-        task = self.db.query(Task).filter(Task.id == task_id).first()
+    def update_task(self, task_id: int, update_data: TaskUpdate, user_id: int) -> Task:
+        task = self.db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
         if not task:
             raise ValueError("Task not found")
         
@@ -516,8 +523,8 @@ class JobService:
         self.db.refresh(task)
         return task
 
-    def delete_task(self, task_id: int):
-        task = self.db.query(Task).filter(Task.id == task_id).first()
+    def delete_task(self, task_id: int, user_id: int):
+        task = self.db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
         if not task:
             raise ValueError("Task not found")
         self.db.delete(task)

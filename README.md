@@ -45,7 +45,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **ORM**: SQLAlchemy
 - **Database**: PostgreSQL (via Alembic migrations)
 - **AI**: OpenAI GPT-4o-mini + Whisper
-- **Auth**: Google OAuth token verification
+- **Auth**: JWT (JSON Web Tokens) with Google OAuth 2.0
 
 ### AI Integration
 - **LLM**: GPT-4o-mini with structured output (JSON schema)
@@ -106,7 +106,12 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] PWA manifest with app icons
   - [x] Service worker for offline support
   - [x] Safe area insets for notched phones
-  - [x] Reduced motion accessibility support
+- [x] Reduced motion accessibility support
+- [x] **JWT Authentication & Session Management**
+  - [x] Short-lived access tokens (15min)
+  - [x] Long-lived refresh tokens (7 days) with background auto-refresh
+  - [x] Ownership enforcement on all protected routes
+  - [x] Secure token management in frontend (Axios interceptors)
 
 ### 🔧 Core Components
 - **LoginPage**: Google OAuth with floating calendar animations
@@ -136,6 +141,11 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
    - Email notifications
    - Browser push notifications
    - Customizable reminder times
+
+3. **Templates**
+   - Create templates for recurring events (Template Events) which are stored differently from normal events.
+   - Detect templates from user input (e.g tommorow is a rest day, or tommorow is a gym day, or tommorow is a work day).
+   - Functions on Template Events for mass removal, replacement, or insertion of Template Events.
 
 5. **User Preferences**
    - Default task duration
@@ -195,12 +205,13 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - No CI/CD pipeline ❌
   - No monitoring/alerting ❌
 
-- **Security** (8/10)
+- **Security** (9/10)
   - Google OAuth ✅
   - Secrets Management (Config Hierarchy) ✅
   - Rate limiting ✅
   - Input sanitization ✅
   - HTTPS enforcement ✅
+  - JWT Authentication & Protected Routes ✅
 
 - **Reliability** (4/10)
   - Comprehensive Error Handling ✅
@@ -208,9 +219,10 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - No backup system ❌
   - No data validation (beyond Pydantic) ⚠️
 
-- **Testing** (6/10)
+- **Testing** (7/10)
   - Unit tests (Backend ✅, Frontend ⚠️)
   - AI Prompt Logic ✅
+  - JWT Ownership Verification ✅
   - No integration tests ❌
   - E2E tests (Infrastructure ✅, Coverage ❌)
 
@@ -272,6 +284,7 @@ To set up your environment:
 OPENAI_API_KEY=sk-proj-...
 DATABASE_URL=postgresql://...
 GOOGLE_CLIENT_ID=...
+JWT_SECRET_KEY=... # 32+ character random string
 
 # Frontend
 VITE_API_BASE_URL=https://api.yourdomain.com/v1
@@ -289,8 +302,8 @@ VITE_GOOGLE_CLIENT_ID=...
 
 ## 📊 Current Metrics
 
-- **Lines of Code**: ~10,800
-- **API Endpoints**: 16
+- **Lines of Code**: ~11,100
+- **API Endpoints**: 17
 - **AI Token Usage**: ~200-500 tokens per task creation
 - **Supported Features**: 25+ core features
 - **Database Tables**: 4 (Users, Jobs, JobCandidates, Tasks)
@@ -316,4 +329,4 @@ Private - All Rights Reserved
 ---
 
 **Last Updated**: January 19, 2026  
-**Version**: 0.5.0-alpha
+**Version**: 0.6.0-alpha

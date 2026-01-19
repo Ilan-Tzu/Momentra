@@ -127,3 +127,16 @@ class JobExecuteResponse(BaseModel):
     job_id: int
     status: JobStatus
     tasks_created: List[TaskRead]
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserRead
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
