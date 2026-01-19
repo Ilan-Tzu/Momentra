@@ -100,6 +100,13 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] LLM response caching (1hr TTL, 30% cost reduction)
   - [x] Transcription caching (30min TTL, audio content hashing)
   - [x] Cache statistics endpoint for monitoring
+- [x] **Mobile Responsiveness & PWA**
+  - [x] Adaptive layouts (Mobile/Tablet/Desktop breakpoints)
+  - [x] Touch-friendly interactions (44px tap targets, active states)
+  - [x] PWA manifest with app icons
+  - [x] Service worker for offline support
+  - [x] Safe area insets for notched phones
+  - [x] Reduced motion accessibility support
 
 ### 🔧 Core Components
 - **LoginPage**: Google OAuth with floating calendar animations
@@ -115,17 +122,12 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 ## 📋 Next Steps (Roadmap to MVP)
 
 ### High Priority
-1. **Mobile Responsiveness**
-   - Adaptive calendar layout
-   - Touch-friendly interactions
-   - PWA capabilities
-
-2. **Calendar Integration**
+1. **Calendar Integration**
    - Google Calendar sync (two-way)
    - webcal export/import
 
 ### Medium Priority
-3. **Recurring Tasks**
+2. **Recurring Tasks**
    - Daily/weekly/monthly patterns
    - Custom recurrence rules
    - Smart handling of conflicts
@@ -168,7 +170,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 
 ## 🏁 Distance from Production
 
-### Current Status: **Alpha (70% Production-Ready)**
+### Current Status: **Alpha (75% Production-Ready)**
 
 #### What's Production-Ready ✅
 - Core scheduling logic
@@ -183,6 +185,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Comprehensive Testing Suite (AI, API, UI)**
 - **API Rate Limiting & Caching**
 - **Security Hardening (HTTPS & Sanitization)**
+- **Mobile Responsiveness & PWA**
 
 #### Critical Gaps 🚧
 - **Infrastructure** (4/10)
@@ -192,9 +195,9 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - No CI/CD pipeline ❌
   - No monitoring/alerting ❌
 
-- **Security** (7/10)
+- **Security** (8/10)
   - Google OAuth ✅
-  - API keys in .env ⚠️ (needs secrets manager)
+  - Secrets Management (Config Hierarchy) ✅
   - Rate limiting ✅
   - Input sanitization ✅
   - HTTPS enforcement ✅
@@ -241,15 +244,38 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 
 ---
 
-## 🔐 Environment Setup
+## 🔐 Configuration & Secrets Management
 
-### Required API Keys
+Momentra uses a multi-layered configuration strategy to ensure security and ease of deployment.
+
+### 1. Configuration Hierarchy (Backend)
+The backend uses `Pydantic Settings` which follows this order of priority:
+1. **Environment Variables**: Set directly on the host (Highest priority, recommended for Production).
+2. **.env File**: Local file (Only loaded in `development` mode).
+3. **Defaults**: Hardcoded values in `app/config.py`.
+
+### 2. Environment Setup
+To set up your environment:
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Copy `frontend/.env.example` to `frontend/.env`.
+3. Add your sensitive keys (`OPENAI_API_KEY`, etc.) to the `.env` files.
+4. **DO NOT commit `.env` files.** The root `.gitignore` is configured to protect them.
+
+### 3. Production Hardening
+- **Secrets Manager**: In production, we recommend using a dedicated manager to inject variables.
+- **Redaction**: Sensitive logs automatically redact secret prefixes/suffixes via `settings.get_safe_settings()`.
+- **Enforcement**: Setting `ENVIRONMENT=production` disables `.env` file loading.
+
+### 🔑 Required API Keys
 ```bash
-# Backend (.env in /backend)
+# Backend
 OPENAI_API_KEY=sk-proj-...
+DATABASE_URL=postgresql://...
+GOOGLE_CLIENT_ID=...
 
-# Frontend (.env in /frontend)
-VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+# Frontend
+VITE_API_BASE_URL=https://api.yourdomain.com/v1
+VITE_GOOGLE_CLIENT_ID=...
 ```
 
 ### Google OAuth Setup
@@ -263,7 +289,7 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 
 ## 📊 Current Metrics
 
-- **Lines of Code**: ~10,400
+- **Lines of Code**: ~10,800
 - **API Endpoints**: 16
 - **AI Token Usage**: ~200-500 tokens per task creation
 - **Supported Features**: 25+ core features
@@ -290,4 +316,4 @@ Private - All Rights Reserved
 ---
 
 **Last Updated**: January 19, 2026  
-**Version**: 0.4.1-alpha
+**Version**: 0.5.0-alpha

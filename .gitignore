@@ -1,0 +1,23 @@
+# Backend
+backend/.env
+backend/.venv
+backend/__pycache__/
+backend/*.db
+backend/.pytest_cache/
+backend/alembic/versions/*.pyc
+
+# Frontend
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/node_modules/
+frontend/dist/
+frontend/stats.html
+
+# General
+.DS_Store
+.env
+.agent/
+*.log

@@ -1,0 +1,337 @@
+/* =============================================================================
+   MOBILE RESPONSIVENESS - Momentra
+   =============================================================================
+   Breakpoints:
+   - Mobile: max-width 480px
+   - Tablet: 481px - 768px
+   - Desktop: 769px+
+   ============================================================================= */
+
+/* Touch-friendly base adjustments */
+@media (hover: none) and (pointer: coarse) {
+
+    /* Touch devices - larger tap targets */
+    button,
+    .nav-link,
+    .calendar-day-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Disable hover effects on touch */
+    .calendar-day-btn:hover {
+        transform: none;
+    }
+
+    /* Add active state for touch feedback */
+    .calendar-day-btn:active {
+        transform: scale(0.95);
+        opacity: 0.8;
+    }
+
+    button:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+}
+
+/* =============================================================================
+   MOBILE (max-width: 480px)
+   ============================================================================= */
+@media screen and (max-width: 480px) {
+
+    /* Navbar */
+    .navbar {
+        padding: 10px 16px;
+    }
+
+    .navbar-brand {
+        font-size: 18px;
+    }
+
+    .navbar-links {
+        gap: 4px;
+    }
+
+    .nav-link {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .nav-logout {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    /* Body padding for fixed navbar */
+    body {
+        padding-top: 56px;
+    }
+
+    /* Container */
+    .container {
+        padding: 12px;
+        max-width: 100%;
+        gap: 12px;
+    }
+
+    /* Calendar Strip */
+    .calendar-strip {
+        gap: 8px;
+        padding: 8px 2px;
+        /* Enable momentum scrolling on iOS */
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .calendar-day-btn {
+        min-width: 70px;
+        height: 90px;
+        padding: 12px 8px;
+        border-radius: 12px;
+    }
+
+    .day-name {
+        font-size: 10px;
+    }
+
+    .day-number {
+        font-size: 20px;
+    }
+
+    .month-name {
+        font-size: 10px;
+    }
+
+    /* Input Card */
+    .input-card {
+        padding: 16px;
+        border-radius: 16px;
+        margin-bottom: 16px;
+    }
+
+    textarea {
+        font-size: 16px;
+        /* Prevents iOS zoom on focus */
+    }
+
+    /* Task List */
+    .task-list {
+        gap: 8px;
+    }
+
+    .task-item {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .task-time {
+        font-size: 12px;
+    }
+
+    .task-title {
+        font-size: 14px;
+    }
+
+    /* Preview Modal */
+    .review-overlay {
+        padding: 12px;
+        align-items: flex-end;
+        /* Slide up from bottom on mobile */
+    }
+
+    .review-modal {
+        max-height: 85vh;
+        border-radius: 20px 20px 0 0;
+        margin-bottom: 0;
+    }
+
+    .review-header h2 {
+        font-size: 18px;
+    }
+
+    .candidate-card {
+        padding: 12px;
+    }
+
+    .candidate-meta span {
+        font-size: 11px;
+    }
+
+    /* Conflict Modal */
+    .conflict-modal {
+        padding: 16px;
+        border-radius: 20px 20px 0 0;
+        max-height: 90vh;
+    }
+
+    .conflict-task-card {
+        padding: 12px;
+    }
+
+    .conflict-task-card h4 {
+        font-size: 14px;
+    }
+
+    /* Edit Modal */
+    .edit-modal-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    .edit-modal {
+        border-radius: 20px 20px 0 0;
+        max-height: 90vh;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Time inputs - prevent zoom */
+    input[type="time"],
+    input[type="date"],
+    input[type="text"] {
+        font-size: 16px;
+    }
+
+    /* Buttons */
+    .create-btn,
+    .voice-btn {
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    .input-actions {
+        gap: 8px;
+    }
+
+    /* Toast */
+    .toast {
+        bottom: 20px;
+        left: 16px;
+        right: 16px;
+        width: auto;
+        font-size: 14px;
+    }
+}
+
+/* =============================================================================
+   TABLET (481px - 768px)
+   ============================================================================= */
+@media screen and (min-width: 481px) and (max-width: 768px) {
+    .container {
+        max-width: 600px;
+        padding: 16px;
+    }
+
+    .calendar-strip {
+        gap: 10px;
+    }
+
+    .calendar-day-btn {
+        min-width: 80px;
+        height: 100px;
+    }
+
+    .review-modal {
+        max-width: 90%;
+    }
+
+    .edit-modal {
+        max-width: 500px;
+    }
+}
+
+/* =============================================================================
+   LANDSCAPE MOBILE
+   ============================================================================= */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+    body {
+        padding-top: 50px;
+    }
+
+    .navbar {
+        padding: 8px 16px;
+    }
+
+    .container {
+        min-height: auto;
+        padding-bottom: 20px;
+    }
+
+    .calendar-strip {
+        max-height: 80px;
+    }
+
+    .calendar-day-btn {
+        height: 70px;
+        min-width: 65px;
+    }
+
+    .day-number {
+        font-size: 18px;
+    }
+
+    /* Modals in landscape */
+    .review-overlay,
+    .edit-modal-overlay {
+        align-items: center;
+    }
+
+    .review-modal,
+    .edit-modal,
+    .conflict-modal {
+        max-height: 80vh;
+        border-radius: 16px;
+    }
+}
+
+/* =============================================================================
+   SAFE AREA INSETS (for notched phones)
+   ============================================================================= */
+@supports (padding: max(0px)) {
+    body {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .navbar {
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+
+    @media screen and (max-width: 480px) {
+
+        .review-modal,
+        .edit-modal,
+        .conflict-modal {
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+        }
+    }
+}
+
+/* =============================================================================
+   REDUCED MOTION (Accessibility)
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* =============================================================================
+   DARK MODE ADJUSTMENTS (Already dark, but ensure consistency)
+   ============================================================================= */
+@media (prefers-color-scheme: light) {
+
+    /* Keep dark theme regardless of system preference */
+    :root {
+        color-scheme: dark;
+    }
+}

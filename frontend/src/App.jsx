@@ -6,6 +6,7 @@ import Navbar from './components/Navbar'
 import LoginPage from './components/LoginPage'
 import EditEventModal from './components/EditEventModal'
 import './App.css'
+import './mobile.css'
 
 import { formatToLocalTime, toLocalISOString, toUTC, normalizeToUTC, handleTimeShift } from './utils/dateUtils'
 
