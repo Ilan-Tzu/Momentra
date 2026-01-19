@@ -8,7 +8,11 @@
     position: absolute;
     top: 0;
     left: 0;
-    background: transparent;
+    background: #0F0518;
+    background-image:
+        radial-gradient(circle at 15% 15%, rgba(176, 0, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(255, 0, 207, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 50% 0%, rgba(48, 0, 255, 0.5) 0%, transparent 70%);
     z-index: 3000;
     overflow: hidden;
 }
@@ -22,365 +26,119 @@
     overflow: hidden;
 }
 
-.floating-block {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    border-radius: 16px;
-    background: rgba(139, 92, 246, 0.06);
-    border: 1px solid rgba(139, 92, 246, 0.1);
-    backdrop-filter: blur(8px);
-    opacity: 0.4;
-}
-
+/* Base styles for blocks - shared between JS engine and CSS */
+/* Note: Size and position are now mostly handled by inline styles/JS */
 .floating-block .block-day {
     font-size: 10px;
-    font-weight: 500;
-    color: rgba(216, 180, 254, 0.5);
+    font-weight: 700;
+    color: rgba(255, 0, 207, 0.9);
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
 }
 
 .floating-block .block-num {
     font-size: 24px;
     font-weight: 300;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.6);
 }
 
-/* Position and animation variations - Unique fluid paths */
-.block-1 {
-    top: 8%;
-    left: -5%;
-    animation: driftDiagonalRight 45s linear infinite;
-}
-
-.block-2 {
-    top: 70%;
-    left: 3%;
-    animation: driftUp 50s linear infinite;
-    animation-delay: -15s;
-}
-
-.block-3 {
-    top: 12%;
-    right: -4%;
-    animation: driftDiagonalLeft 42s linear infinite;
-    animation-delay: -8s;
-}
-
-.block-4 {
-    top: 80%;
-    right: 8%;
-    animation: driftUp 55s linear infinite;
-    animation-delay: -25s;
-}
-
-.block-5 {
-    top: 40%;
-    left: 90%;
-    animation: driftDiagonalLeft 48s linear infinite;
-    animation-delay: -12s;
-}
-
-.block-6 {
-    top: 90%;
-    left: 35%;
-    animation: driftRight 52s linear infinite;
-    animation-delay: -20s;
-}
-
-.block-7 {
-    top: -8%;
-    left: 55%;
-    animation: driftDown 46s linear infinite;
-    animation-delay: -30s;
-}
-
-.block-8 {
-    top: 55%;
-    right: -10%;
-    animation: driftDiagonalRight 40s linear infinite;
-    animation-delay: -18s;
-}
-
-/* Fluid directional animations */
-@keyframes driftDiagonalRight {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-
-    25% {
-        transform: translate(80px, 40px) rotate(2deg);
-        opacity: 0.4;
-    }
-
-    50% {
-        transform: translate(160px, 80px) rotate(0deg);
-        opacity: 0.3;
-    }
-
-    75% {
-        transform: translate(80px, 40px) rotate(-2deg);
-        opacity: 0.45;
-    }
-
-    100% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-}
-
-@keyframes driftDiagonalLeft {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.3;
-    }
-
-    25% {
-        transform: translate(-70px, 50px) rotate(-2deg);
-        opacity: 0.45;
-    }
-
-    50% {
-        transform: translate(-140px, 100px) rotate(0deg);
-        opacity: 0.35;
-    }
-
-    75% {
-        transform: translate(-70px, 50px) rotate(2deg);
-        opacity: 0.4;
-    }
-
-    100% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.3;
-    }
-}
-
-@keyframes driftUp {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-
-    25% {
-        transform: translate(20px, -60px) rotate(1deg);
-        opacity: 0.4;
-    }
-
-    50% {
-        transform: translate(0, -120px) rotate(0deg);
-        opacity: 0.35;
-    }
-
-    75% {
-        transform: translate(-20px, -60px) rotate(-1deg);
-        opacity: 0.45;
-    }
-
-    100% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-}
-
-@keyframes driftDown {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.3;
-    }
-
-    25% {
-        transform: translate(-15px, 70px) rotate(-1deg);
-        opacity: 0.45;
-    }
-
-    50% {
-        transform: translate(0, 140px) rotate(0deg);
-        opacity: 0.3;
-    }
-
-    75% {
-        transform: translate(15px, 70px) rotate(1deg);
-        opacity: 0.4;
-    }
-
-    100% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.3;
-    }
-}
-
-@keyframes driftRight {
-    0% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-
-    25% {
-        transform: translate(60px, -10px) rotate(1deg);
-        opacity: 0.4;
-    }
-
-    50% {
-        transform: translate(120px, 0) rotate(0deg);
-        opacity: 0.35;
-    }
-
-    75% {
-        transform: translate(60px, 10px) rotate(-1deg);
-        opacity: 0.45;
-    }
-
-    100% {
-        transform: translate(0, 0) rotate(0deg);
-        opacity: 0.25;
-    }
-}
-
-/* Login Card */
+/* Login Card - SLEEK THEME WITH VIBRANT GLOW */
 .login-card {
-    background: rgba(60, 20, 100, 0.25);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    padding: 40px;
-    border-radius: 32px;
-    border: 1px solid rgba(192, 132, 252, 0.15);
-    box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(135deg, rgba(176, 0, 255, 0.4) 0%, rgba(48, 0, 255, 0.3) 100%);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    padding: 60px 40px;
+    border-radius: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow:
+        0 50px 100px -20px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(176, 0, 255, 0.3),
+        0 0 80px rgba(255, 0, 207, 0.2),
+        inset 0 0 80px rgba(255, 0, 207, 0.1);
     width: 90%;
-    max-width: 400px;
+    max-width: 440px;
     text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
     position: relative;
-    z-index: 1;
+    z-index: 10;
+    animation: modalPopUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Vibrancy Pulse Effect */
+.login-card::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 42px;
+    padding: 2px;
+    background: linear-gradient(135deg, #B000FF, #FF00CF, #3000FF);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.8;
+    box-shadow: 0 0 30px rgba(255, 0, 207, 0.4);
+    animation: cardGlowPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes cardGlowPulse {
+    0% {
+        opacity: 0.5;
+        box-shadow: 0 0 20px rgba(176, 0, 255, 0.3);
+    }
+
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 50px rgba(255, 0, 207, 0.6);
+    }
+}
+
+@keyframes modalPopUp {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(255, 0, 207, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 .login-card h1 {
-    font-size: 32px;
-    font-weight: 300;
+    font-size: 42px;
+    font-weight: 800;
     margin: 0;
-    color: white;
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 30px rgba(167, 139, 250, 0.3);
+    background: linear-gradient(to right, #ffffff, #FF00CF);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
 }
 
 .login-card p {
-    color: rgba(233, 213, 255, 0.7);
+    color: rgba(255, 255, 255, 0.7);
     margin: 0;
-    font-size: 15px;
-    font-weight: 300;
-}
-
-.login-input {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 16px 20px;
-    border-radius: 16px;
-    color: white;
     font-size: 16px;
-    outline: none;
-    transition: all 0.3s ease;
-    box-sizing: border-box;
-    font-family: inherit;
-    font-weight: 300;
-}
-
-.login-input:focus {
-    border-color: rgba(192, 132, 252, 0.5);
-    box-shadow: 0 0 0 4px rgba(192, 132, 252, 0.1);
-}
-
-.login-input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-}
-
-.login-btn {
-    width: 100%;
-    background: linear-gradient(135deg, #A855F7 0%, #7C3AED 100%);
-    color: white;
-    border: none;
-    padding: 16px;
-    border-radius: 16px;
-    font-weight: 600;
-    font-size: 16px;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    margin-top: 12px;
-    box-shadow: 0 10px 20px -5px rgba(124, 58, 237, 0.4);
-}
-
-.login-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 28px -5px rgba(124, 58, 237, 0.5);
-}
-
-.login-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.login-toggle-btn {
-    background: none;
-    border: none;
-    color: rgba(233, 213, 255, 0.7);
-    font-size: 14px;
-    cursor: pointer;
-    padding: 8px;
-    margin-top: 8px;
-    transition: color 0.2s;
     font-weight: 400;
-}
-
-.login-toggle-btn:hover {
-    color: white;
-}
-
-.error-msg {
-    color: #FCA5A5;
-    font-size: 14px;
-    margin-top: 8px;
-}
-
-/* Swipe Animations */
-.swipe-right {
-    animation: swipeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 100%;
-}
-
-.swipe-left {
-    animation: swipeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 100%;
-}
-
-@keyframes swipeInRight {
-    from {
-        opacity: 0;
-        transform: translateX(30px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes swipeInLeft {
-    from {
-        opacity: 0;
-        transform: translateX(-30px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+    letter-spacing: 0.02em;
 }
 
 /* Google Login Wrapper */
@@ -388,13 +146,62 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 20px 0;
-    min-height: 44px;
+    margin-top: 32px;
+    min-height: 48px;
+    position: relative;
+    z-index: 1;
 }
 
 .loading-text {
-    color: rgba(233, 213, 255, 0.7);
-    font-size: 15px;
-    font-weight: 300;
-    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 16px;
+    font-weight: 500;
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+.error-msg {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #F87171;
+    font-size: 14px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    margin-top: 24px;
+    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes shake {
+
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
 }

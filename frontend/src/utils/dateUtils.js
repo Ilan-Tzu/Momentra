@@ -46,3 +46,11 @@ export const formatToLocalDate = (dateObj) => {
         '-' + pad(dateObj.getMonth() + 1) +
         '-' + pad(dateObj.getDate());
 };
+
+export const handleTimeShift = (timeStr, deltaMinutes) => {
+    if (!timeStr) return '09:00';
+    const [h, m] = timeStr.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m + deltaMinutes);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+};
