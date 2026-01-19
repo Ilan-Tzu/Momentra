@@ -81,7 +81,6 @@ class LLMAdapter:
         # Parse user's local time if provided, otherwise use server time
         if user_local_time:
             try:
-                from datetime import datetime
                 from dateutil import parser as date_parser
                 user_dt = date_parser.isoparse(user_local_time)
                 current_date_str = user_dt.strftime("%Y-%m-%d (%A)")
