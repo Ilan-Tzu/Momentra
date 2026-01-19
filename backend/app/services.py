@@ -1,12 +1,10 @@
 from sqlalchemy.orm import Session
 from .models import Job, JobCandidate, Task, JobStatus, User
 from .schemas import JobCreate, JobCandidateRead, JobCandidateUpdate, TaskUpdate
-import os
+from .config import settings
 import json
 from datetime import datetime, timezone
 from typing import List, Optional
-
-
 
 from .llm_adapter import LLMAdapter
 
@@ -57,7 +55,8 @@ class JobService:
             # Verify the token with Google
             idinfo = google_id_token.verify_oauth2_token(
                 id_token, 
-                requests.Request()
+                requests.Request(),
+                audience=settings.GOOGLE_CLIENT_ID
             )
             
             # Token is valid, return user info
