@@ -23,6 +23,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Smart resolution UI**: Clear visual comparison of conflicting tasks
 - **Flexible override**: Force-save when you need to (with a warning system)
 - **Recursive conflict checking**: Handles cascading schedule changes
+- **Non-Blocking Logic**: Intelligently distinguishes between logistical backdrops (Airbnb, Hotels) and rigid commitments (Flights, Meetings)
 
 ### Premium User Experience
 - **Glassmorphism design**: Modern, elegant UI with blur effects and gradients
@@ -74,9 +75,13 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] "Save Anyway" override with pulse animation
   - [x] Strict time validation (End > Start)
 - **[x] Multi-Day Task Visualization**
-  - [x] **Horizontal Bars**: Sleek 3px bars in the calendar strip spanning multiple days
+  - [x] **Proportional Bars**: Bar length and position now reflect exact hours (8 AM start shows longer bar than 8 PM)
   - [x] **Vertical Connectors**: Task list shows "Start", "Continued", and "End" segments with visual connecting lines
   - [x] **Range Filtering**: Tasks spanning across days are tracked and displayed on every inhabited day
+- [x] **Non-Blocking Task Support**
+  - [x] **Database Attribute**: `is_blocking` flag on all tasks
+  - [x] **Logistical Bypass**: "Airbnb", "Stay", and "Hotel" events are non-blocking—meetings can be scheduled during them without conflict
+  - [x] **Rigid Enforcement**: "Flights" and "Appointments" remain blocking to ensure no double-booking
 - [x] **Stay Ambiguity Handling**
   - [x] Automatic detection of Airbnb/Hotel/Stay keywords without times
   - [x] "Educated Guess" options for standard check-in (3pm) and check-out (11am)
@@ -90,6 +95,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - [x] Time ambiguity handling (AM/PM clarification)
 - [x] **Sleek Calendar Strip**
   - [x] High-density 30-day view (Thinned for better space efficiency)
+  - [x] **Polarized Layout**: Dates pinned to top, event strips to bottom for maximum visual clarity
   - [x] Task dots indicator (up to 3 per day)
   - [x] Smooth scrolling calendar navigation
 - [x] Glassmorphism UI design
@@ -343,5 +349,5 @@ Private - All Rights Reserved
 
 ---
 
-**Last Updated**: January 19, 2026 (18:40)  
-**Version**: 0.7.0-alpha
+**Last Updated**: January 19, 2026 (19:20)  
+**Version**: 0.8.0-alpha

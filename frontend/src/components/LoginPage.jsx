@@ -8,75 +8,75 @@ function LoginPage({ onLogin }) {
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
 
+    // State for Feature Ticker
+    const [featureIndex, setFeatureIndex] = useState(0)
+    const features = [
+        "Smart Conflict Resolution",
+        "AI-Powered Multiple Event Parsing",
+        "Seamless Calendar Integration",
+        "Write it quickly, get it done with quality",
+        "Speak your schedule into existence",
+        "Quick Template Actions"
+    ]
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFeatureIndex((prev) => (prev + 1) % features.length)
+        }, 3500) // Slightly slower rotation
+        return () => clearInterval(interval)
+    }, [])
+
     // Refs for animation engine
     const canvasRef = useRef(null)
     const containerRef = useRef(null)
+    const cardRef = useRef(null)
     const blocksRef = useRef([])
     const requestRef = useRef()
+    const mouseRef = useRef({ x: -1000, y: -1000 })
 
-    const NUM_BLOCKS = 10
-    const VELOCITY = 0.2
-    const LINK_DISTANCE = 380
+    const NUM_BLOCKS = 15
+    const VELOCITY = 0.05 // Even slower from 0.12
+    const LINK_DISTANCE = 300
+    const REPULSION_RADIUS = 250 // Slightly larger area
 
-    // Initialize blocks with random positions and velocities
+    // State for initial blocks to avoid sudden appearance after mount
+    const [blocks, setBlocks] = useState(() => {
+        // Initial setup with placeholder positions until useEffect runs
+        return Array.from({ length: 15 }).map((_, i) => ({
+            id: i + 1,
+            x: -200, // Off screen briefly
+            y: -200,
+            vx: 0,
+            vy: 0,
+            width: 100,
+            height: 100,
+            radius: 50,
+        }))
+    })
+
+    // Initialize blocks with real positions and consistent drift directions
     useEffect(() => {
         const w = window.innerWidth
         const h = window.innerHeight
-        const blocks = Array.from({ length: NUM_BLOCKS }).map((_, i) => {
-            const blockX = Math.random() * (w - 120)
-            const blockY = Math.random() * (h - 120)
 
-            const getVel = () => {
-                const v = (Math.random() - 0.5) * 2 * VELOCITY
-                return Math.abs(v) < 0.1 ? (v > 0 ? 0.1 : -0.1) : v
-            }
-
+        // Give each block a consistent, slow drift direction
+        const initializedBlocks = blocks.map((block, i) => {
+            const angle = (i / blocks.length) * Math.PI * 2 // Spread directions evenly
             return {
-                id: i + 1,
-                x: blockX,
-                y: blockY,
-                vx: getVel(),
-                vy: getVel(),
-                width: 100,
-                height: 100,
-                radius: 50,
+                ...block,
+                x: Math.random() * w,
+                y: Math.random() * h,
+                // Consistent directional drift
+                vx: Math.cos(angle) * VELOCITY,
+                vy: Math.sin(angle) * VELOCITY,
+                // Phase offset for sinusoidal wobble
+                phase: Math.random() * Math.PI * 2,
             }
         })
-        blocksRef.current = blocks
+        setBlocks(initializedBlocks)
+        blocksRef.current = initializedBlocks
 
-        blocks.forEach(block => {
-            const el = document.getElementById(`block-${block.id}`)
-            if (el) el.style.transform = `translate(${block.x}px, ${block.y}px)`
-        })
-
-        const resolveCollision = (b1, b2) => {
-            const dx = (b1.x + b1.radius) - (b2.x + b2.radius)
-            const dy = (b1.y + b1.radius) - (b2.y + b2.radius)
-            const distance = Math.sqrt(dx * dx + dy * dy)
-            const minDistance = b1.radius + b2.radius
-
-            if (distance < minDistance) {
-                const nx = dx / distance
-                const ny = dy / distance
-                const rvx = b1.vx - b2.vx
-                const rvy = b1.vy - b2.vy
-                const velAlongNormal = rvx * nx + rvy * ny
-
-                if (velAlongNormal > 0) return
-
-                const impulse = 2 * velAlongNormal
-                b1.vx -= (impulse / 2) * nx
-                b1.vy -= (impulse / 2) * ny
-                b2.vx += (impulse / 2) * nx
-                b2.vy += (impulse / 2) * ny
-
-                const overlap = minDistance - distance
-                b1.x += (overlap / 2) * nx
-                b1.y += (overlap / 2) * ny
-                b2.x -= (overlap / 2) * nx
-                b2.y -= (overlap / 2) * ny
-            }
-        }
+        let time = 0
 
         const animate = () => {
             const canvas = canvasRef.current
@@ -89,56 +89,60 @@ function LoginPage({ onLogin }) {
             if (canvas.width !== width || canvas.height !== height) {
                 canvas.width = width
                 canvas.height = height
-                ctx.fillStyle = '#0F0518'
-                ctx.fillRect(0, 0, width, height)
             }
 
-            // Create TRACE EFFECT by filling with semi-transparent background
-            ctx.fillStyle = 'rgba(15, 5, 24, 0.15)'
-            ctx.fillRect(0, 0, width, height)
+            ctx.clearRect(0, 0, width, height)
+            time += 0.01
 
-            // Update positions
+            // Update positions with smooth, ambient motion
             blocksRef.current.forEach(block => {
-                block.x += block.vx
-                block.y += block.vy
+                // Gentle sinusoidal wobble for organic feel
+                const wobbleX = Math.sin(time + block.phase) * 0.02
+                const wobbleY = Math.cos(time * 0.7 + block.phase) * 0.02
 
-                // Boundary collision logic with hard clamping
-                if (block.x <= 0) {
-                    block.x = 0; block.vx = Math.abs(block.vx)
-                } else if (block.x + block.width >= width) {
-                    block.x = width - block.width; block.vx = -Math.abs(block.vx)
+                // Very subtle mouse influence - blocks drift slightly away
+                const dx = block.x + block.radius - mouseRef.current.x
+                const dy = block.y + block.radius - mouseRef.current.y
+                const dist = Math.sqrt(dx * dx + dy * dy)
+
+                let mouseInfluenceX = 0
+                let mouseInfluenceY = 0
+                if (dist < REPULSION_RADIUS && dist > 0) {
+                    const force = Math.pow((REPULSION_RADIUS - dist) / REPULSION_RADIUS, 2) * 0.003
+                    mouseInfluenceX = (dx / dist) * force
+                    mouseInfluenceY = (dy / dist) * force
                 }
 
-                if (block.y <= 0) {
-                    block.y = 0; block.vy = Math.abs(block.vy)
-                } else if (block.y + block.height >= height) {
-                    block.y = height - block.height; block.vy = -Math.abs(block.vy)
-                }
+                // Apply smooth movement
+                block.x += block.vx + wobbleX + mouseInfluenceX
+                block.y += block.vy + wobbleY + mouseInfluenceY
+
+                // Seamless wrap around screen edges
+                if (block.x < -block.width) block.x = width + 10
+                if (block.x > width + block.width) block.x = -10
+                if (block.y < -block.height) block.y = height + 10
+                if (block.y > height + block.height) block.y = -10
             })
 
-            // Resolve block-to-block collisions
-            for (let i = 0; i < blocksRef.current.length; i++) {
-                for (let j = i + 1; j < blocksRef.current.length; j++) {
-                    resolveCollision(blocksRef.current[i], blocksRef.current[j])
-                }
-            }
-
-            // Sync DOM elements and Draw Trace Heads
+            // Sync DOM elements with smooth transform
             blocksRef.current.forEach(block => {
                 const el = document.getElementById(`block-${block.id}`)
-                if (el) el.style.transform = `translate(${block.x}px, ${block.y}px)`
+                if (el) {
+                    el.style.transform = `translate(${block.x.toFixed(2)}px, ${block.y.toFixed(2)}px)`
+                }
 
-                // Draw a small glowing particle on canvas for the trace
+                // Draw soft glow on canvas around each block
                 const centerX = block.x + block.radius
                 const centerY = block.y + block.radius
-                const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 20)
-                gradient.addColorStop(0, 'rgba(176, 0, 255, 0.3)')
-                gradient.addColorStop(1, 'transparent')
-                ctx.fillStyle = gradient
-                ctx.fillRect(centerX - 20, centerY - 20, 40, 40)
+                const glowGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 120)
+                glowGradient.addColorStop(0, 'rgba(139, 92, 246, 0.08)')
+                glowGradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.03)')
+                glowGradient.addColorStop(1, 'transparent')
+                ctx.fillStyle = glowGradient
+                ctx.fillRect(centerX - 120, centerY - 120, 240, 240)
             })
 
-            // Draw Neural Net Links
+            // Draw subtle connection lines between nearby blocks
             for (let i = 0; i < blocksRef.current.length; i++) {
                 for (let j = i + 1; j < blocksRef.current.length; j++) {
                     const b1 = blocksRef.current[i]
@@ -149,23 +153,14 @@ function LoginPage({ onLogin }) {
 
                     if (dist < LINK_DISTANCE) {
                         const ratio = 1 - dist / LINK_DISTANCE
-                        const opacity = Math.pow(ratio, 2.5) * 0.5
+                        // Very subtle lines - truly background
+                        const opacity = Math.pow(ratio, 2) * 0.08
                         ctx.beginPath()
-                        ctx.strokeStyle = `rgba(176, 0, 255, ${opacity})`
-                        ctx.lineWidth = ratio * 2
+                        ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`
+                        ctx.lineWidth = 1
                         ctx.moveTo(b1.x + b1.radius, b1.y + b1.radius)
                         ctx.lineTo(b2.x + b2.radius, b2.y + b2.radius)
                         ctx.stroke()
-
-                        if (dist < LINK_DISTANCE * 0.4) {
-                            const glowOpacity = Math.pow(1 - dist / (LINK_DISTANCE * 0.4), 2) * 0.3
-                            ctx.beginPath()
-                            ctx.strokeStyle = `rgba(255, 0, 207, ${glowOpacity})`
-                            ctx.lineWidth = ratio * 4
-                            ctx.moveTo(b1.x + b1.radius, b1.y + b1.radius)
-                            ctx.lineTo(b2.x + b2.radius, b2.y + b2.radius)
-                            ctx.stroke()
-                        }
                     }
                 }
             }
@@ -177,6 +172,29 @@ function LoginPage({ onLogin }) {
         return () => cancelAnimationFrame(requestRef.current)
     }, [])
 
+    const handleMouseMove = (e) => {
+        if (!containerRef.current || !cardRef.current) return
+
+        const { clientX, clientY } = e
+        mouseRef.current = { x: clientX, y: clientY }
+
+        // Card Spotlight & Tilt
+        const rect = cardRef.current.getBoundingClientRect()
+        const x = clientX - rect.left
+        const y = clientY - rect.top
+
+        cardRef.current.style.setProperty('--mouse-x', `${x}px`)
+        cardRef.current.style.setProperty('--mouse-y', `${y}px`)
+
+        // 3D Tilt Effect
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+
+        const rotateX = ((clientY - centerY) / (window.innerHeight / 2)) * -5 // Max 5deg tilt
+        const rotateY = ((clientX - centerX) / (window.innerWidth / 2)) * 5
+
+        cardRef.current.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`
+    }
     const handleGoogleSuccess = async (credentialResponse) => {
         setError('')
         setIsLoading(true)
@@ -202,70 +220,59 @@ function LoginPage({ onLogin }) {
     }
 
     return (
-        <div className="login-container" ref={containerRef}>
-            <canvas
-                ref={canvasRef}
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    zIndex: 0
-                }}
-            />
-            <style>
-                {`
-                .floating-block {
-                    position: absolute;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 16px;
-                    border-radius: 20px;
-                    background: rgba(176, 0, 255, 0.08) !important;
-                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                    backdrop-filter: blur(12px);
-                    opacity: 0.5 !important;
-                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
-                    z-index: 1;
-                    width: 100px !important;
-                    height: 100px !important;
-                    left: 0;
-                    top: 0;
-                    will-change: transform;
-                }
-
-                @keyframes breathe {
-                    0% { transform: scale(0.9) rotate(0deg); }
-                    100% { transform: scale(1.1) rotate(5deg); }
-                }
-                `}
-            </style>
+        <div
+            className="login-container"
+            ref={containerRef}
+            onMouseMove={handleMouseMove}
+        >
+            <canvas ref={canvasRef} />
 
             {/* Floating Calendar Blocks Background */}
             <div className="floating-blocks">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(id => (
-                    <div key={id} id={`block-${id}`} className="floating-block">
+                {blocks.map((block, idx) => (
+                    <div
+                        key={block.id}
+                        id={`block-${block.id}`}
+                        className="floating-block"
+                        style={{
+                            animationDelay: `${idx * 0.1}s`,
+                            opacity: 0 // Start hidden for fade-in
+                        }}
+                    >
                         <div style={{
                             animation: `breathe ${7 + Math.random() * 5}s ease-in-out infinite alternate`,
-                            animationDelay: `${-Math.random() * 10}s`,
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center'
                         }}>
-                            <span className="block-day">{['Mon', 'Wed', 'Fri', 'Sun', 'Tue', 'Thu', 'Sat', 'Mon', 'Tue', 'Wed'][id - 1]}</span>
-                            <span className="block-num">{[15, 23, 8, 31, 12, 4, 19, 26, 7, 14][id - 1]}</span>
+                            <span className="block-day">{['Mon', 'Wed', 'Fri', 'Sun', 'Tue'][block.id % 5]}</span>
+                            <span className="block-num">{Math.floor(Math.random() * 30) + 1}</span>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="login-card">
+            <div className="login-card" ref={cardRef}>
                 <h1>Welcome to Momentra</h1>
-                <p>Sign in to manage your calendar</p>
+
+                {/* Feature Ticker */}
+                <div style={{ height: '24px', overflow: 'hidden', position: 'relative' }}>
+                    {features.map((text, i) => (
+                        <p
+                            key={i}
+                            style={{
+                                position: 'absolute',
+                                width: '100%',
+                                transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                                opacity: i === featureIndex ? 1 : 0,
+                                transform: `translateY(${i === featureIndex ? 0 : 20}px)`,
+                                margin: 0
+                            }}
+                        >
+                            {text}
+                        </p>
+                    ))}
+                </div>
 
                 <div className="google-login-wrapper">
                     {isLoading ? (

@@ -1,4 +1,5 @@
-/* Login Page Styles */
+/* LoginPage.css - Midnight Neural Network Design */
+
 .login-container {
     display: flex;
     justify-content: center;
@@ -8,178 +9,324 @@
     position: absolute;
     top: 0;
     left: 0;
-    background: #0F0518;
-    background-image:
-        radial-gradient(circle at 15% 15%, rgba(176, 0, 255, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 85% 30%, rgba(255, 0, 207, 0.12) 0%, transparent 50%),
-        radial-gradient(circle at 50% 0%, rgba(48, 0, 255, 0.5) 0%, transparent 70%);
-    z-index: 3000;
+    /* Rich gradient background with purple accents */
+    background:
+        radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(124, 58, 237, 0.12) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 0%, rgba(88, 28, 135, 0.25) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 100%, rgba(30, 10, 60, 0.4) 0%, transparent 50%),
+        linear-gradient(180deg, #0F0518 0%, #130820 40%, #0d0315 100%);
+    z-index: 10;
     overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    perspective: 1000px;
 }
 
-/* Floating Calendar Blocks Background */
+/* Film Grain Overlay */
+.login-container::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.4;
+    animation: grain 8s steps(10) infinite;
+}
+
+@keyframes grain {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    10% {
+        transform: translate(-5%, -10%);
+    }
+
+    20% {
+        transform: translate(-15%, 5%);
+    }
+
+    30% {
+        transform: translate(7%, -25%);
+    }
+
+    40% {
+        transform: translate(-5%, 25%);
+    }
+
+    50% {
+        transform: translate(-15%, 10%);
+    }
+
+    60% {
+        transform: translate(15%, 0%);
+    }
+
+    70% {
+        transform: translate(0%, 15%);
+    }
+
+    80% {
+        transform: translate(3%, 35%);
+    }
+
+    90% {
+        transform: translate(-10%, 10%);
+    }
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Floating Blocks - Modern Glass Cards */
 .floating-blocks {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
+    z-index: 1;
 }
 
-/* Base styles for blocks - shared between JS engine and CSS */
-/* Note: Size and position are now mostly handled by inline styles/JS */
+.floating-block {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    border-radius: 24px;
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    backdrop-filter: blur(8px);
+    z-index: 1;
+    width: 90px;
+    height: 90px;
+    left: 0;
+    top: 0;
+    will-change: transform, opacity;
+    animation: blockFadeIn 2s ease-out forwards;
+    /* Illumination glow */
+    box-shadow:
+        0 0 40px rgba(139, 92, 246, 0.15),
+        0 0 80px rgba(139, 92, 246, 0.08),
+        inset 0 0 20px rgba(139, 92, 246, 0.05);
+}
+
+@keyframes blockFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+
+    to {
+        opacity: 0.4;
+    }
+}
+
 .floating-block .block-day {
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255, 0, 207, 0.9);
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(139, 92, 246, 0.35);
     text-transform: uppercase;
     letter-spacing: 0.12em;
+    margin-bottom: 2px;
 }
 
 .floating-block .block-num {
-    font-size: 24px;
-    font-weight: 300;
-    color: rgba(255, 255, 255, 0.6);
+    font-size: 22px;
+    font-weight: 200;
+    color: rgba(255, 255, 255, 0.2);
+    letter-spacing: -0.03em;
 }
 
-/* Login Card - SLEEK THEME WITH VIBRANT GLOW */
+.floating-block .block-num {
+    font-size: 28px;
+    font-weight: 200;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: -0.05em;
+}
+
+/* Login Card - Ultra Premium Glass */
 .login-card {
-    background: linear-gradient(135deg, rgba(176, 0, 255, 0.4) 0%, rgba(48, 0, 255, 0.3) 100%);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-    padding: 60px 40px;
+    --mouse-x: 50%;
+    --mouse-y: 50%;
+
+    background: rgba(15, 5, 24, 0.7);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    padding: 60px 48px;
     border-radius: 40px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    /* Spotlight Border Effect */
+    position: relative;
+    border: 1px solid transparent;
+    /* Fallback */
+
+    /* We use a pseudo-element for the spotlight border to avoid affecting layout */
+
     box-shadow:
-        0 50px 100px -20px rgba(0, 0, 0, 0.6),
-        0 0 40px rgba(176, 0, 255, 0.3),
-        0 0 80px rgba(255, 0, 207, 0.2),
-        inset 0 0 80px rgba(255, 0, 207, 0.1);
+        0 40px 100px -20px rgba(0, 0, 0, 0.8),
+        inset 0 0 80px rgba(176, 0, 255, 0.05);
+
     width: 90%;
     max-width: 440px;
     text-align: center;
     display: flex;
     flex-direction: column;
     gap: 24px;
-    position: relative;
     z-index: 10;
-    animation: modalPopUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+    /* 3D Transform Settings */
+    transform-style: preserve-3d;
+    will-change: transform;
+
+    /* Initial Entry Animation */
+    animation: cardFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Vibrancy Pulse Effect */
-.login-card::after {
-    content: '';
+/* Dynamic Spotlight Border Overlay */
+.login-card::before {
+    content: "";
     position: absolute;
-    inset: -2px;
-    border-radius: 42px;
-    padding: 2px;
-    background: linear-gradient(135deg, #B000FF, #FF00CF, #3000FF);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    inset: -1px;
+    border-radius: 40px;
+    padding: 1px;
+    /* border width */
+    background: radial-gradient(800px circle at var(--mouse-x) var(--mouse-y),
+            rgba(176, 0, 255, 0.4),
+            rgba(255, 255, 255, 0.1) 40%,
+            transparent 80%);
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
-    z-index: -1;
-    opacity: 0.8;
-    box-shadow: 0 0 30px rgba(255, 0, 207, 0.4);
-    animation: cardGlowPulse 4s ease-in-out infinite alternate;
+    z-index: 2;
 }
 
-@keyframes cardGlowPulse {
-    0% {
-        opacity: 0.5;
-        box-shadow: 0 0 20px rgba(176, 0, 255, 0.3);
-    }
-
-    100% {
-        opacity: 1;
-        box-shadow: 0 0 50px rgba(255, 0, 207, 0.6);
-    }
-}
-
-@keyframes modalPopUp {
-    from {
-        opacity: 0;
-        transform: scale(0.9) translateY(40px);
-    }
-
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-.login-card::before {
-    content: '';
+/* Spotlight Shine Effect on Background */
+.login-card::after {
+    content: "";
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at center, rgba(255, 0, 207, 0.1) 0%, transparent 70%);
+    inset: 0;
+    border-radius: 40px;
+    background: radial-gradient(600px circle at var(--mouse-x) var(--mouse-y),
+            rgba(176, 0, 255, 0.06),
+            transparent 60%);
     pointer-events: none;
-    z-index: 0;
+    z-index: 1;
 }
 
 .login-card h1 {
     font-size: 42px;
     font-weight: 800;
     margin: 0;
-    background: linear-gradient(to right, #ffffff, #FF00CF);
+    background: linear-gradient(135deg, #FFFFFF 0%, #E9D5FF 50%, #A855F7 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.04em;
     line-height: 1.1;
+    filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.3));
 }
 
 .login-card p {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(216, 180, 254, 0.7);
     margin: 0;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 400;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
 }
 
 /* Google Login Wrapper */
 .google-login-wrapper {
+    margin-top: 20px;
     display: flex;
     justify-content: center;
-    align-items: center;
-    margin-top: 32px;
-    min-height: 48px;
-    position: relative;
-    z-index: 1;
+    min-height: 50px;
+    animation: fadeIn 1.2s ease-out;
 }
 
 .loading-text {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 16px;
+    color: #A855F7;
     font-weight: 500;
-    animation: pulse 1.5s infinite ease-in-out;
+    letter-spacing: 0.05em;
+    animation: pulse 2s infinite;
+}
+
+.error-msg {
+    color: #F87171;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+/* Animations */
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(40px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes pulse {
 
     0%,
     100% {
-        opacity: 0.6;
+        opacity: 1;
+        transform: scale(1);
     }
 
     50% {
-        opacity: 1;
+        opacity: 0.7;
+        transform: scale(0.98);
     }
 }
 
-.error-msg {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #F87171;
-    font-size: 14px;
-    padding: 10px 16px;
-    border-radius: 12px;
-    margin-top: 24px;
-    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+@keyframes breathe {
+    0% {
+        transform: scale(0.95) rotate(0deg);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(1.05) rotate(3deg);
+        opacity: 0.7;
+    }
 }
 
 @keyframes shake {

@@ -33,7 +33,8 @@
 
 .calendar-day-btn {
     min-width: 75px;
-    height: 95px;
+    height: 90px;
+    /* Reduced from 110px - more space without month label */
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
@@ -47,12 +48,35 @@
     color: white;
     position: relative;
     padding: 10px 12px;
+    overflow: hidden;
+}
+
+/* Shine effect - subtle */
+.calendar-day-btn::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent 40%,
+            rgba(255, 255, 255, 0.08) 50%,
+            transparent 60%);
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    transition: transform 0.8s ease;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .calendar-day-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: scale(1.05);
-    box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.03);
+    box-shadow: 0 8px 16px -3px rgba(168, 85, 247, 0.25);
+}
+
+.calendar-day-btn:hover::after {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
 }
 
 /* Today State */
@@ -78,55 +102,132 @@
     margin-bottom: 2px;
     opacity: 0.7;
     text-transform: capitalize;
+    position: relative;
+    z-index: 2;
 }
 
 .day-number {
-    font-size: 20px;
+    font-size: 24px;
+    /* Slightly larger since we have more space */
     font-weight: 300;
-    margin-bottom: 2px;
-}
-
-.month-name {
-    font-size: 11px;
-    opacity: 0.6;
-    margin-bottom: 4px;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 2;
 }
 
 /* Multi-Day Task Bars */
 .task-bars-container {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2.5px;
+    /* Slightly tighter for 4 lanes */
     width: 100%;
     margin-bottom: 4px;
     margin-top: auto;
     /* Push to bottom of the button */
     padding: 0 2px;
+    position: relative;
+    z-index: 2;
+}
+
+/* Month Separator */
+.month-separator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    min-width: 60px;
+    height: 90px;
+    flex-shrink: 0;
+}
+
+.month-separator-line {
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(to bottom,
+            transparent,
+            rgba(168, 85, 247, 0.5) 20%,
+            rgba(168, 85, 247, 0.8) 50%,
+            rgba(168, 85, 247, 0.5) 80%,
+            transparent);
+    border-radius: 2px;
+}
+
+.month-separator-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(168, 85, 247, 1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: rgba(17, 24, 39, 0.95);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    white-space: nowrap;
+}
+
+
+.task-lane-slot {
+    position: relative;
+    width: 100%;
+    height: 3px;
+    min-height: 3px;
+    display: flex;
+    align-items: center;
 }
 
 .task-bar {
     height: 3px;
     width: 100%;
     background: linear-gradient(90deg, #38BDF8, #0EA5E9);
-    /* Sky/Cyan */
     opacity: 0.9;
     border-radius: 0;
     box-shadow: 0 2px 4px rgba(56, 189, 248, 0.3);
+    position: relative;
 }
 
+/* Visual distinction for boundaries */
 .task-bar.start {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-left: 2px solid rgba(255, 255, 255, 0.8);
+    /* Clear start marker */
+    padding-left: 2px;
 }
 
 .task-bar.end {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
+    /* Clear end marker */
+    padding-right: 2px;
+}
+
+/* Single-day events get both markers */
+.task-bar.start.end {
+    border-radius: 6px;
+    border-left: 2px solid rgba(255, 255, 255, 0.8);
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
+    padding: 0 2px;
 }
 
 .task-bar.middle {
     width: 100%;
     border-radius: 0;
+    border: none;
+}
+
+/* Add spacing between strips in the same lane */
+.task-lane-slot .task-bar:not(:last-child) {
+    margin-right: 4px;
+}
+
+.task-bar.spacer {
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
 }
 
 .task-bar-overflow {

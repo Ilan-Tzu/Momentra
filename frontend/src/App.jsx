@@ -64,7 +64,58 @@ function App() {
     isDestructive: false
   });
 
+  // Search State
+  const [searchModal, setSearchModal] = useState({
+    isOpen: false,
+    query: '',
+    results: []
+  });
+
+  const [highlightedTaskId, setHighlightedTaskId] = useState(null);
+
   const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+  // Search handlers
+  const handleSearchOpen = () => {
+    setSearchModal({ isOpen: true, query: '', results: [] });
+  };
+
+  const handleSearchClose = () => {
+    setSearchModal({ isOpen: false, query: '', results: [] });
+  };
+
+  const handleSearchQuery = (query) => {
+    setSearchModal(prev => ({ ...prev, query }));
+
+    if (!query.trim()) {
+      setSearchModal(prev => ({ ...prev, results: [] }));
+      return;
+    }
+
+    // Search through all calendar tasks
+    const results = calendarTasks.filter(task =>
+      task.title?.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 10); // Limit to 10 results
+
+    setSearchModal(prev => ({ ...prev, results }));
+  };
+
+  const handleSelectSearchResult = (task) => {
+    // Navigate to the task's date
+    const taskDate = new Date(normalizeToUTC(task.start_time));
+    setSelectedDate(taskDate);
+
+    // Highlight the task
+    setHighlightedTaskId(task.id);
+
+    // Remove highlight after 3 seconds
+    setTimeout(() => {
+      setHighlightedTaskId(null);
+    }, 3000);
+
+    // Close search modal
+    handleSearchClose();
+  };
 
   useEffect(() => {
     if (user) {
@@ -196,8 +247,10 @@ function App() {
     // Normalize Candidates: Treat Naive LLM output as LOCAL -> Convert to UTC
     const normalizedCandidates = preview.candidates.map(c => {
       const p = { ...c.parameters };
-      if (p.start_time) p.start_time = normalizeToUTC(p.start_time);
-      if (p.end_time) p.end_time = normalizeToUTC(p.end_time);
+      // LLM returns times in user's local timezone, so we need to convert to UTC
+      if (p.start_time) p.start_time = toUTC(p.start_time);
+      if (p.end_time) p.end_time = toUTC(p.end_time);
+      if (p.existing_start_time) p.existing_start_time = toUTC(p.existing_start_time);
       return { ...c, parameters: p };
     });
 
@@ -212,8 +265,15 @@ function App() {
         ignore_conflicts: force
       });
       await jobService.deleteJobCandidate(candidateId);
-      setCandidates(prev => prev.filter(c => c.id !== candidateId));
+      const remainingCandidates = candidates.filter(c => c.id !== candidateId);
+      setCandidates(remainingCandidates);
       await fetchCalendarTasks();
+
+      // If no more candidates, close the preview modal
+      if (remainingCandidates.length === 0) {
+        reset();
+      }
+
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (e) {
@@ -553,7 +613,7 @@ function App() {
       <div className={`container ${status === 'preview' ? 'blur-bg' : ''}`}>
 
         {/* Hero Section */}
-        <div className="hero-section" style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div className="hero-section" style={{ textAlign: 'center' }}>
           <h1>Momentra Calendar</h1>
           <p>Describe your events in your words</p>
         </div>
@@ -606,7 +666,7 @@ function App() {
 
         {/* Home: Calendar Dashboard Card */}
         <div className="calendar-dashboard-card">
-          <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>Upcoming Events</h2>
+          <h2 className="section-header">Upcoming Events</h2>
           <CalendarStrip
             tasks={calendarTasks}
             selectedDate={selectedDate}
@@ -615,8 +675,17 @@ function App() {
         </div>
 
         <div className="day-tasks-header">
-          <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule</h3>
-          <span className="event-badge">{selectedDayTasks.length} events</span>
+          <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule ({selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })})</h3>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <span className="event-badge">{selectedDayTasks.length} events</span>
+            <button
+              className="search-btn"
+              onClick={handleSearchOpen}
+              title="Search events"
+            >
+              <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
+            </button>
+          </div>
         </div>
 
         <div className="day-tasks-list">
@@ -630,7 +699,7 @@ function App() {
               else if (task.taskType === 'task-middle') displayTime = 'Continued';
 
               return (
-                <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType}`}>
+                <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
                   <div className="task-time">
                     {displayTime}
                   </div>
@@ -658,175 +727,199 @@ function App() {
                   <h2>Review Events</h2>
                   <button onClick={reset} className="close-btn">✕</button>
                 </div>
-                <p className="sub-header">{candidates.length} events found</p>
+                <p className="sub-header">{candidates.length} events created</p>
               </div>
 
               <div className="review-body">
-                {candidates.map(candidate => (
+                {candidates.map((candidate) => (
                   <div key={candidate.id} className={`review-item-card ${candidate.command_type === 'AMBIGUITY' ? 'ambiguity-item' : ''}`}>
-                    <div className="card-content">
-                      <h3>{candidate.parameters?.title && candidate.parameters.title !== 'CREATE_TASK' ? candidate.parameters.title : (candidate.description !== 'CREATE_TASK' ? candidate.description : 'New Event')}</h3>
+                    {/* Event Title */}
+                    <h3 className="event-title">
+                      {candidate.parameters?.title && candidate.parameters.title !== 'CREATE_TASK'
+                        ? candidate.parameters.title
+                        : (candidate.description !== 'CREATE_TASK' ? candidate.description : 'New Event')}
+                    </h3>
 
-                      {candidate.command_type === 'AMBIGUITY' ? (
-                        <div className="ambiguity-content">
-                          <h4>
-                            {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
-                              ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time))}. What would you like to do?`
-                              : candidate.parameters.message}
-                          </h4>
-                          <div className="ambiguity-opts">
-                            {candidate.parameters.options?.map((opt, i) => (
-                              <button key={i} onClick={async () => {
-                                let val = {};
-                                try { val = JSON.parse(opt.value) } catch (e) { }
+                    {/* Event Details */}
+                    <div className="event-details">
+                      <div className="detail-row">
+                        <span className="detail-icon">📅</span>
+                        <span className="detail-text">
+                          {candidate.parameters.start_time
+                            ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                            : 'No date'}
+                        </span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-icon">🕒</span>
+                        <span className="detail-text">
+                          {candidate.parameters.start_time ? (
+                            <>
+                              {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time))}
+                              {candidate.parameters.end_time && (
+                                <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time))}</>
+                              )}
+                            </>
+                          ) : 'No time'}
+                        </span>
+                      </div>
+                    </div>
 
-                                if (val.discard) {
-                                  await jobService.deleteJobCandidate(candidate.id);
-                                  await refreshPreview(jobId);
-                                  return;
-                                }
+                    {/* Content Area (Ambiguity OR Actions) */}
+                    {candidate.command_type === 'AMBIGUITY' ? (
+                      <div className="ambiguity-content">
+                        <h4>
+                          {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
+                            ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time))}. What would you like to do?`
+                            : candidate.parameters.message}
+                        </h4>
+                        <div className="ambiguity-opts">
+                          {candidate.parameters.options?.map((opt, i) => (
+                            <button key={i} onClick={async () => {
+                              let val = {};
+                              try { val = JSON.parse(opt.value) } catch (e) { }
 
-                                if (val.keep_both) {
-                                  const replaceOption = candidate.parameters.options?.find(o => {
-                                    try {
-                                      const parsed = JSON.parse(o.value);
-                                      return parsed.remove_task_id;
-                                    } catch { return false; }
-                                  });
-                                  let existingTaskId = null;
-                                  if (replaceOption) {
-                                    try {
-                                      existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
-                                    } catch { }
-                                  }
+                              if (val.discard) {
+                                await jobService.deleteJobCandidate(candidate.id);
+                                await refreshPreview(jobId);
+                                return;
+                              }
 
-                                  const existingTask = calendarTasks.find(t => t.id === existingTaskId);
-                                  const newTaskTime = (val.start_time || candidate.parameters.start_time)
-                                    ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time))
-                                    : '09:00';
-                                  const existingTaskTime = existingTask?.start_time
-                                    ? formatToLocalTime(normalizeToUTC(existingTask.start_time))
-                                    : '09:00';
-
-                                  setConflictModal({
-                                    isOpen: true,
-                                    newTask: {
-                                      title: val.title,
-                                      start_time: val.start_time,
-                                      end_time: val.end_time,
-                                      candidateId: candidate.id
-                                    },
-                                    existingTask: existingTask ? {
-                                      id: existingTask.id,
-                                      title: existingTask.title,
-                                      start_time: existingTask.start_time,
-                                      end_time: existingTask.end_time
-                                    } : null,
-                                    newTaskTime,
-                                    existingTaskTime,
-                                    newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
-                                    existingTaskDate: existingTask?.start_time ? toLocalISOString(new Date(existingTask.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0]
-                                  });
-                                  return;
-                                }
-
-                                if (val.remove_task_id) {
+                              if (val.keep_both) {
+                                const replaceOption = candidate.parameters.options?.find(o => {
                                   try {
-                                    await jobService.deleteTask(val.remove_task_id);
-                                  } catch (e) {
-                                    console.error("Failed to delete conflicting task", e);
-                                  }
+                                    const parsed = JSON.parse(o.value);
+                                    return parsed.remove_task_id;
+                                  } catch { return false; }
+                                });
+                                let existingTaskId = null;
+                                if (replaceOption) {
+                                  try {
+                                    existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
+                                  } catch { }
                                 }
 
-                                const newTitle = val.title || candidate.description.replace('Conflict: ', '').replace('Ambiguity: ', '');
-                                const updated = await jobService.updateJobCandidate(candidate.id, {
-                                  description: newTitle,
-                                  command_type: 'CREATE_TASK',
-                                  parameters: {
-                                    title: newTitle,
+                                const existingTask = calendarTasks.find(t => t.id === existingTaskId);
+                                const newTaskTime = (val.start_time || candidate.parameters.start_time)
+                                  ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time))
+                                  : '09:00';
+                                const existingTaskTime = existingTask?.start_time
+                                  ? formatToLocalTime(normalizeToUTC(existingTask.start_time))
+                                  : '09:00';
+
+                                setConflictModal({
+                                  isOpen: true,
+                                  newTask: {
+                                    title: val.title,
                                     start_time: val.start_time,
                                     end_time: val.end_time,
-                                    description: val.description
-                                  }
+                                    candidateId: candidate.id
+                                  },
+                                  existingTask: existingTask ? {
+                                    id: existingTask.id,
+                                    title: existingTask.title,
+                                    start_time: existingTask.start_time,
+                                    end_time: existingTask.end_time
+                                  } : null,
+                                  newTaskTime,
+                                  existingTaskTime,
+                                  newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
+                                  existingTaskDate: existingTask?.start_time ? toLocalISOString(new Date(existingTask.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0]
                                 });
+                                return;
+                              }
 
-                                if (updated.command_type !== 'AMBIGUITY') {
-                                  await finalizeAcceptance(candidate.id);
-                                } else {
-                                  await refreshPreview(jobId);
-                                }
-                              }}>{opt.label}</button>
-                            ))}
-                            <button className="other-opt-btn" onClick={() => {
-                              let prefillStart = new Date();
-                              let prefillEnd = null;
-                              let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
-
-                              if (candidate.parameters.options?.length > 0) {
+                              if (val.remove_task_id) {
                                 try {
-                                  const firstOpt = JSON.parse(candidate.parameters.options[0].value);
-                                  if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
-                                  if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
-                                  if (firstOpt.title) prefillTitle = firstOpt.title;
-                                } catch (e) { console.error("Failed to parse first option", e); }
-                              }
-
-                              if (!prefillEnd) {
-                                prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
-                              }
-
-                              handleEditOpen({
-                                id: candidate.id,
-                                description: prefillTitle,
-                                parameters: {
-                                  ...candidate.parameters,
-                                  title: prefillTitle,
-                                  start_time: prefillStart.toISOString(),
-                                  end_time: prefillEnd.toISOString()
+                                  await jobService.deleteTask(val.remove_task_id);
+                                } catch (e) {
+                                  console.error("Failed to delete conflicting task", e);
                                 }
-                              }, 'candidate');
-                            }}>Other</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="candidate-content">
-                          <div className="candidate-meta attention-sparkle">
-                            <span>📅 {candidate.parameters.start_time ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'No date'}</span>
-                            <span>🕒 {candidate.parameters.start_time ? (
-                              <>
-                                {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time))}
-                                {candidate.parameters.end_time && (
-                                  <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time))}</>
-                                )}
-                              </>
-                            ) : ''}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                              }
 
-                    <div className="card-controls">
-                      <button className="reject-btn" onClick={() => {
-                        setConfirmModal({
-                          isOpen: true,
-                          title: 'Reject Event',
-                          message: 'Are you sure you want to reject this event?',
-                          isDestructive: true,
-                          onConfirm: async () => {
-                            await jobService.deleteJobCandidate(candidate.id);
-                            await refreshPreview(jobId);
-                            closeConfirm();
-                          }
-                        });
-                      }}>Reject</button>
+                              const newTitle = val.title || candidate.description.replace('Conflict: ', '').replace('Ambiguity: ', '');
+                              const updated = await jobService.updateJobCandidate(candidate.id, {
+                                description: newTitle,
+                                command_type: 'CREATE_TASK',
+                                parameters: {
+                                  title: newTitle,
+                                  start_time: val.start_time,
+                                  end_time: val.end_time,
+                                  description: val.description
+                                }
+                              });
 
-                      {candidate.command_type !== 'AMBIGUITY' && (
-                        <>
-                          <button className="edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
-                          <button className="accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
-                        </>
-                      )}
-                    </div>
+                              if (updated.command_type !== 'AMBIGUITY') {
+                                await finalizeAcceptance(candidate.id);
+                              } else {
+                                await refreshPreview(jobId);
+                              }
+                            }}>{opt.label}</button>
+                          ))}
+                          <button className="other-opt-btn" onClick={() => {
+                            let prefillStart = new Date();
+                            let prefillEnd = null;
+                            let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
+
+                            if (candidate.parameters.options?.length > 0) {
+                              try {
+                                const firstOpt = JSON.parse(candidate.parameters.options[0].value);
+                                if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
+                                if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
+                                if (firstOpt.title) prefillTitle = firstOpt.title;
+                              } catch (e) { console.error("Failed to parse first option", e); }
+                            }
+
+                            if (!prefillEnd) {
+                              prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
+                            }
+
+                            handleEditOpen({
+                              id: candidate.id,
+                              description: prefillTitle,
+                              parameters: {
+                                ...candidate.parameters,
+                                title: prefillTitle,
+                                start_time: prefillStart.toISOString(),
+                                end_time: prefillEnd.toISOString()
+                              }
+                            }, 'candidate');
+                          }}>Other</button>
+                          <div style={{ flex: 1 }}></div>
+                          <button className="ambiguity-reject-btn" onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: 'Reject Event',
+                              message: 'Are you sure you want to reject this event?',
+                              isDestructive: true,
+                              onConfirm: async () => {
+                                await jobService.deleteJobCandidate(candidate.id);
+                                await refreshPreview(jobId);
+                                closeConfirm();
+                              }
+                            });
+                          }}>Reject</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="event-actions">
+                        <button className="action-btn reject-btn" onClick={() => {
+                          setConfirmModal({
+                            isOpen: true,
+                            title: 'Reject Event',
+                            message: 'Are you sure you want to reject this event?',
+                            isDestructive: true,
+                            onConfirm: async () => {
+                              await jobService.deleteJobCandidate(candidate.id);
+                              await refreshPreview(jobId);
+                              closeConfirm();
+                            }
+                          });
+                        }}>Reject</button>
+                        <button className="action-btn edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
+                        <button className="action-btn accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -995,6 +1088,73 @@ function App() {
         onConfirm={confirmModal.onConfirm}
         onCancel={closeConfirm}
       />
+
+      {/* Search Modal */}
+      {searchModal.isOpen && (
+        <div className="modal-overlay" onClick={handleSearchClose}>
+          <div className="search-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="search-header">
+              <h3>Search Events</h3>
+              <button className="close-btn" onClick={handleSearchClose}>×</button>
+            </div>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search by event title..."
+              value={searchModal.query}
+              onChange={(e) => handleSearchQuery(e.target.value)}
+              autoFocus
+            />
+            <div className="search-results">
+              {searchModal.query && searchModal.results.length === 0 && (
+                <p className="no-results">No events found</p>
+              )}
+              {searchModal.results.map(task => {
+                const startDate = new Date(normalizeToUTC(task.start_time));
+                const endDate = new Date(normalizeToUTC(task.end_time));
+                const startDateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const isMultiDay = startDateStr !== endDateStr;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="search-result-item"
+                    onClick={() => handleSelectSearchResult(task)}
+                  >
+                    <div className="result-title">{task.title}</div>
+                    <div className="result-date">
+                      {isMultiDay ? (
+                        <>
+                          {startDate.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })} {formatToLocalTime(task.start_time)}
+                          {' → '}
+                          {endDate.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })} {formatToLocalTime(task.end_time)}
+                        </>
+                      ) : (
+                        <>
+                          {startDate.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })} at {formatToLocalTime(task.start_time)}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
