@@ -57,12 +57,13 @@ class AIParseResult(BaseModel):
 from datetime import datetime
 
 class LLMAdapter:
-    def parse_text(self, text: str, user_local_time: str = None, ai_temperature: float = 0.0, personal_context: str = None) -> dict:
+    def parse_text(self, text: str, user_local_time: str = None, ai_temperature: float = 0.0, personal_context: str = None, user_id: int = None) -> dict:
         """
         Sends text to OpenAI and enforces a strict JSON schema return.
         user_local_time: ISO format with timezone, e.g., "2026-01-19T10:00:00+02:00"
         ai_temperature: float between 0.0 and 1.0 (default 0.0)
         personal_context: Optional string containing user's personal context/preferences
+        user_id: Optional user ID for token usage tracking
         """
         # --- CHECK CACHE FIRST ---
         from .rate_limit import get_cached_response, cache_response
@@ -148,87 +149,48 @@ class LLMAdapter:
         - User's Timezone: {timezone_info}
         {personal_context_section}
         
-        CRITICAL: ALL TIMES YOU OUTPUT MUST BE IN UTC (with 'Z' suffix).
-        When user says "4pm", convert it to UTC based on their timezone ({timezone_info}).
-        Example: If user is in UTC+2 and says "8am", output "2026-01-19T06:00:00Z" (8am local = 6am UTC).
+        CORE DIRECTIVE: EVERYTHING YOU OUTPUT MUST BE IN UTC (with 'Z' suffix).
+        Convert local times to UTC using the offset provided ({timezone_info}).
         
         Upcoming Days Reference:
 {upcoming_days_context}
-
         
-        Step 1: Analyze the input in the 'reasoning' field. Explicitly state what is vague.
-        Step 2: Extract tasks, calendar commands, and ambiguities.
-        Step 3: CONVERT ALL TIMES TO UTC before outputting.
+        STEPS:
+        1. Analyze input in 'reasoning'. Focus on temporal clues and semantic context.
+        2. Identify tasks, commands, or ambiguities.
+        3. Infer AM/PM from semantic clues (e.g. meals, social habits, personal context) before flagging ambiguity. 
+           Inferred times are considered UNAMBIGUOUS; create tasks for them immediately.
+        4. Transpose all dates/times into UTC.
         
-        Rules for Ambiguity:
-          1. If time is in 24-hour format (e.g. "15", "15:00", "13", "22"), it is UNAMBIGUOUS - extract directly:
-             - Numbers 13-23 are ALWAYS PM (13=1pm, 15=3pm, 22=10pm)
-             - Numbers 0-12 without AM/PM may need clarification IF context doesn't help
-          2. If time has AM/PM specified (e.g. "10am", "10 PM"), extract it directly - NO ambiguity.
-          3. Smart Context Inference (Do this BEFORE flagging ambiguity):
-             - "Breakfast", "Morning", "Wake up" -> AM (e.g. "Breakfast at 8" = 8 AM)
-             - "Dinner", "Evening", "Night", "Party", "Drinks" -> PM (e.g. "Dinner at 8" = 8 PM)
-             - "Lunch" -> PM (12pm-2pm)
-             - "Work" -> AM (start) or PM (end) depending on typical hours, default to 9am start if vague.
-             - "Gym", "Workout" -> Ambiguous if not specified, unless "morning workout" etc.
-             
-             CRITICAL: If you infer AM/PM from these context words, the time is considered UNAMBIGUOUS.
-             create a TASK for it immediately. Do NOT create an Ambiguity.
-
-          4. ONLY create Ambiguity if:
-             - Time is 1-12 without AM/PM AND context provides NO clues (e.g. "Call Bob at 4").
-             - NO TIME FOR STAY: For "Airbnb", "Hotel", "Visit", or "Stay" tasks involving dates but missing specific times, ALWAYS raise an Ambiguity to confirm Check-in and Check-out times. Suggest standard times (e.g. 3 PM Check-in, 11 AM Check-out) as 'educated guesses'.
-          
-          5. When generating an Ambiguity:
-             - CRITICAL: The 'title' field must be the ACTUAL TASK NAME (e.g. "Dentist Appointment", "Meeting with Bob", "Airbnb"). 
-             - Do NOT use generic titles like "Meeting Time?" or "Ambiguity".
-             - The title should describe WHAT the event is, not WHAT is ambiguous.
-             - Provide logical options (e.g. 8 AM vs 8 PM).
-             - The 'value' in each option must INCLUDE the 'title' field with the same task name.
-             - Generate a helpful 'message' asking the user to clarify the time.
-             - ALL TIMES IN OPTIONS MUST BE UTC (with 'Z' suffix).
-             
-          6. Convert relative dates (tomorrow, next monday, friday) to ISO timestamps using Current Date context.
-           
-        - IMPORTANT: If user says a weekday (e.g. "Friday") and today is Sunday, it means the UPCOMING Friday (not past).
-        - User's Current Date is {current_date_str}. "Friday" should be calculated relative to THIS date.
-        - REMEMBER: Output all times in UTC with 'Z' suffix!
+        LOGIC RULES:
+        - 24-hour format: Extract directly (13-23 are always PM).
+        - Ambiguity: Flag ONLY if time is exactly 1-12 and NO semantic clues exist (e.g. "Call Bob at 4").
+        - Stay Events: For "Airbnb", "Hotel", or "Stay", if times are missing, ALWAYS flag ambiguity to confirm check-in/out. Suggest standard times (e.g. 3 PM in / 11 AM out) as options.
+        - Relative Dates: "Tomorrow", "Next Friday", etc., must be calculated from {current_date_str}.
         
-        Example JSON Output (Stay Ambiguity Case):
-        {{
-          "reasoning": "User mentioned 'Airbnb from Tuesday to Thursday' without times. Standard check-in is 3pm, check-out 11am. Raising ambiguity to confirm.",
-          "tasks": [],
-          "ambiguities": [
-            {{
-                "title": "Airbnb",
-                "type": "missing_time", 
-                "message": "When are your check-in and check-out times for the Airbnb?",
-                "options": [
-                    {{"label": "Standard (3pm In / 11am Out)", "value": "{{\\"title\\": \\"Airbnb\\", \\"start_time\\": \\"2026-01-20T13:00:00Z\\", \\"end_time\\": \\"2026-01-22T09:00:00Z\\"}}"}}
-                ]
-            }}
-          ],
-          "commands": []
-        }}
+        AMBIGUITY REQUIREMENTS:
+        - 'title' must be the specific task name (e.g. "Meeting with Bob").
+        - Provide helpful options with UTC values.
+        - The 'value' field of an option must be a JSON string containing the full task parameters.
         """
 
         try:
-            completion = client.beta.chat.completions.parse(
-                model="gpt-4o-mini", 
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text},
-                ],
-                response_format=AIParseResult,
-                max_tokens=500,
-                temperature=ai_temperature,  # Use user preference
-            )
-
-            # The SDK automatically validates the JSON against the Pydantic model
-            parsed_data = completion.choices[0].message.parsed
+            from .llm_tracking import call_llm_with_tracking
             
-            # Convert back to dict for the Service layer
-            result = parsed_data.model_dump()
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ]
+            
+            result = call_llm_with_tracking(
+                client=client,
+                user_id=user_id,
+                feature_name="scheduler",
+                messages=messages,
+                response_format=AIParseResult,
+                temperature=ai_temperature,
+                max_tokens=500
+            )
             
             # Cache the successful response
             cache_response(text, user_local_time, result)

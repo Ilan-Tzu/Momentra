@@ -7,7 +7,6 @@ from . import models, database, routes
 from .logging_config import setup_logging
 from .rate_limit import limiter, rate_limit_exceeded_handler, get_cache_stats
 from .config import settings
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import logging
 
@@ -20,7 +19,7 @@ database.init_db()
 
 app = FastAPI(title="AI Calendar Backend")
 
-# Add middlewares in order (Last added is outermost for requests)
+# Add middlewares
 if settings.ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 
@@ -39,10 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add rate limiter to app state
+# Add rate limiter
 app.state.limiter = limiter
-
-# Register rate limit exception handler
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Global Exception Handler
@@ -56,6 +53,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(routes.router, prefix="/api/v1")
 
+# ==================== Admin Dashboard ====================
+from .admin import setup_admin
+setup_admin(app)
+
 @app.get("/")
 def read_root():
     logger.info("Health check endpoint called")
@@ -65,4 +66,3 @@ def read_root():
 def cache_stats():
     """Return cache statistics for monitoring."""
     return get_cache_stats()
-

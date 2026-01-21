@@ -20,6 +20,7 @@ class User(Base):
     jobs = relationship("Job", back_populates="user")
     tasks = relationship("Task", back_populates="user")
     preferences = relationship("UserPreferences", back_populates="user", uselist=False)
+    token_logs = relationship("TokenLog", back_populates="user")
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -89,3 +90,21 @@ class UserPreferences(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     user = relationship("User", back_populates="preferences")
+
+class TokenLog(Base):
+    """Tracks OpenAI API usage per request for cost monitoring."""
+    __tablename__ = "token_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    feature = Column(String, nullable=False)  # e.g., "scheduler", "transcription"
+    model = Column(String, default="gpt-4o-mini")
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    latency_ms = Column(Float, default=0.0)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    user = relationship("User", back_populates="token_logs")
+

@@ -97,6 +97,14 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - [x] **Mobile Responsiveness & PWA**
   - [x] Adaptive layouts & PWA manifest
   - [x] Notch-safe design for modern devices
+- [x] **Token Usage & Cost Tracking**
+  - [x] Per-user & per-feature spend monitoring
+  - [x] Exact token split (Input vs. Output)
+  - [x] Real-time cost calculation (USD) & latency logging
+- [x] **Admin Dashboard (SQLAdmin)**
+  - [x] Live analytics overview (Cards + Usage Graphs)
+  - [x] Deep inspection of Users, Tasks, AI Jobs, and Token Logs
+  - [x] Safe, read-only monitoring interface
 - [x] **Security & Performance**
   - [x] Rate limiting & LLM/Transcription caching
   - [x] JWT with auto-background token refresh
@@ -109,13 +117,18 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **PreferencesPage**: Tabbed settings (Scheduling, AI, Display) with debounced auto-save
 - **ConflictModal**: High-gravity visual conflict resolution interface
 - **PreviewModal**: LLM-generated task review before acceptance
+- **AdminDashboard**: SQLAdmin-powered monitoring suite with Chart.js analytics
 
 ---
 
 ## 📋 Next Steps (Roadmap to MVP)
 
 ### High Priority
-1. **Calendar Integration**
+1. **Template Data Structure (The "Molecule")**
+   - Specialized schema for modular schedule blocks
+   - Support for complex logic within templates (offsets, relative dependencies)
+
+2. **Calendar Integration (Sync Pipeline)**
    - Google Calendar sync (two-way)
    - webcal export/import
 
@@ -163,10 +176,10 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - Security Hardening
 
 #### Critical Gaps 🚧
-- **Infrastructure** (5/10)
+- **Infrastructure** (6/10)
   - No deployment configuration (Docker/K8s) ❌
   - No CI/CD pipeline ❌
-  - No monitoring/alerting ❌
+  - **Monitoring & Stats API** ✅ (Token logs & Admin Dashboard implemented)
 
 - **Reliability** (6/10)
   - No automated backup system ❌
@@ -236,11 +249,11 @@ VITE_GOOGLE_CLIENT_ID=...
 
 ## 📊 Current Metrics
 
-- **Lines of Code**: ~13,500
-- **API Endpoints**: 19
+- **Lines of Code**: ~14,200
+- **API Endpoints**: 20
 - **AI Token Usage**: ~300-600 tokens per task creation (context-enriched)
-- **Supported Features**: 30+ core features
-- **Database Tables**: 5 (Users, Jobs, JobCandidates, Tasks, UserPreferences)
+- **Supported Features**: 35+ core features
+- **Database Tables**: 6 (Users, Jobs, JobCandidates, Tasks, UserPreferences, TokenLogs)
 
 ---
 
@@ -257,4 +270,4 @@ Private - All Rights Reserved
 ---
 
 **Last Updated**: January 21, 2026  
-**Version**: 0.9.0-alpha
+**Version**: 0.9.1-alpha

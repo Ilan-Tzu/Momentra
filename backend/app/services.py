@@ -171,7 +171,8 @@ class JobService:
             job.raw_text, 
             user_local_time=job.user_local_time,
             ai_temperature=ai_temp,
-            personal_context=p_context
+            personal_context=p_context,
+            user_id=job.user_id
         )
         
         # Clear existing candidates 

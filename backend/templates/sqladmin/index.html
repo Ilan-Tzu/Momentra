@@ -1,0 +1,152 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Overview</h2>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm border-0"
+                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card-body">
+                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Total
+                        Spend (All Time)</h5>
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-dollar-sign fa-2x mr-3 opacity-50"></i>
+                        <h2 class="mb-0" id="total-cost">$0.00</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm border-0"
+                style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <div class="card-body">
+                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Total
+                        Requests</h5>
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-server fa-2x mr-3 opacity-50"></i>
+                        <h2 class="mb-0" id="total-requests">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm border-0"
+                style="background: linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%); color: white;">
+                <div class="card-body">
+                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Project
+                        Status</h5>
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-rocket fa-2x mr-3 opacity-50"></i>
+                        <h2 class="mb-0">Active</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Daily Token Usage & Cost (Last 7 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="usageChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/v1/admin/stats');
+            const data = await response.json();
+
+            // Update Cards
+            document.getElementById('total-cost').textContent = '$' + data.total_cost_usd.toFixed(4);
+            document.getElementById('total-requests').textContent = data.total_requests;
+
+            // Prepare Chart Data
+            // API returns descending (newest first), let's reverse for chart (oldest left)
+            const daily = data.daily_stats.reverse();
+
+            const labels = daily.map(d => d.date);
+            const costs = daily.map(d => d.total_cost);
+            const requests = daily.map(d => d.total_requests);
+
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cost (USD)',
+                            data: costs,
+                            borderColor: '#764ba2',
+                            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                            yAxisID: 'y',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Requests',
+                            data: requests,
+                            borderColor: '#38ef7d',
+                            backgroundColor: 'rgba(56, 239, 125, 0.1)',
+                            yAxisID: 'y1',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Cost ($)' },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Requests' },
+                            grid: {
+                                drawOnChartArea: false, // only want the grid lines for one axis to show up
+                            },
+                            beginAtZero: true
+                        },
+                    }
+                }
+            });
+
+        } catch (e) {
+            console.error("Failed to load admin stats", e);
+        }
+    }
+
+    // Initial Load
+    loadStats();
+</script>
+{% endblock %}

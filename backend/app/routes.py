@@ -292,3 +292,55 @@ def update_preferences(
     db.commit()
     db.refresh(prefs)
     return prefs
+
+# ==================== Admin Endpoints ====================
+
+@router.get("/admin/stats")
+def get_admin_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns aggregated token usage statistics.
+    TODO: Add admin role check for production.
+    """
+    from sqlalchemy import func
+    from datetime import timedelta
+    from .models import TokenLog
+    
+    # Total cost and requests (all time)
+    total_stats = db.query(
+        func.sum(TokenLog.cost_usd).label("total_cost"),
+        func.count(TokenLog.id).label("total_requests")
+    ).first()
+    
+    total_cost = total_stats.total_cost or 0.0
+    total_requests = total_stats.total_requests or 0
+    
+    # Daily stats for last 7 days
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    daily_stats = db.query(
+        func.date(TokenLog.timestamp).label("date"),
+        func.sum(TokenLog.cost_usd).label("total_cost"),
+        func.count(TokenLog.id).label("total_requests")
+    ).filter(
+        TokenLog.timestamp >= seven_days_ago
+    ).group_by(
+        func.date(TokenLog.timestamp)
+    ).order_by(
+        func.date(TokenLog.timestamp).desc()
+    ).all()
+    
+    return {
+        "total_cost_usd": round(total_cost, 6),
+        "total_requests": total_requests,
+        "daily_stats": [
+            {
+                "date": str(stat.date),
+                "total_cost": round(stat.total_cost or 0, 6),
+                "total_requests": stat.total_requests or 0
+            }
+            for stat in daily_stats
+        ]
+    }

@@ -20,3 +20,4 @@ google-auth
 bleach
 python-jose[cryptography]
 PyJWT
+sqladmin
