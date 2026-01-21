@@ -5,6 +5,7 @@ import ConfirmModal from './components/ConfirmModal'
 import Navbar from './components/Navbar'
 import LoginPage from './components/LoginPage'
 import EditEventModal from './components/EditEventModal'
+import PreferencesPage from './components/PreferencesPage'
 import './App.css'
 import './mobile.css'
 
@@ -43,6 +44,9 @@ function App() {
 
   // Navigation state
   const [activePage, setActivePage] = useState('create') // 'create' | 'templates' | 'preferences'
+  const [preferences, setPreferences] = useState(null);
+
+  // ... (conflict modal state) ...
 
   // Conflict Resolution Modal State
   const [conflictModal, setConflictModal] = useState({
@@ -610,549 +614,572 @@ function App() {
         onLogout={handleLogout}
       />
 
-      <div className={`container ${status === 'preview' ? 'blur-bg' : ''}`}>
+      {activePage !== 'preferences' && (
+        <>
+          <div className={`container ${status === 'preview' ? 'blur-bg' : ''}`}>
 
-        {/* Hero Section */}
-        <div className="hero-section" style={{ textAlign: 'center' }}>
-          <h1>Momentra Calendar</h1>
-          <p>Describe your events in your words</p>
-        </div>
+            {/* Hero Section */}
+            <div className="hero-section" style={{ textAlign: 'center' }}>
+              <h1>Momentra Calendar</h1>
+              <p>Describe your events in your words</p>
+            </div>
 
-        {/* Home: Input Card */}
-        <div className="input-card">
-          <div className="input-wrapper" style={{ display: 'flex', gap: '16px', flex: 1 }}>
+            {/* Home: Input Card */}
+            <div className="input-card">
+              <div className="input-wrapper" style={{ display: 'flex', gap: '16px', flex: 1 }}>
 
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleParse();
-                }
-              }}
-              placeholder="e.g., Team meeting tomorrow at 2pm, then dinner at 6pm and a Dentist appointment next Monday..."
-              rows={3}
-              style={{ margin: 0 }} /* Remove margin since wrapper handles gap */
-            />
-          </div>
-          <div className="input-actions">
-            <button
-              className="create-btn"
-              onClick={handleParse}
-              disabled={!rawText.trim() || status === 'loading'}
-            >
-              {status === 'loading' ? 'Processing...' : 'Create Events'}
-            </button>
-            <button
-              className={`mic-btn ${isRecording ? 'recording' : ''}`}
-              onClick={handleRecord}
-              style={{ backgroundColor: isRecording ? '#EF4444' : undefined }}
-            >
-              {isRecording ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="0" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {errorMsg && <p className="error-msg">{errorMsg}</p>}
-        </div>
-
-        {/* Home: Calendar Dashboard Card */}
-        <div className="calendar-dashboard-card">
-          <h2 className="section-header">Upcoming Events</h2>
-          <CalendarStrip
-            tasks={calendarTasks}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
-        </div>
-
-        <div className="day-tasks-header">
-          <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule ({selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })})</h3>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <span className="event-badge">{selectedDayTasks.length} events</span>
-            <button
-              className="search-btn"
-              onClick={handleSearchOpen}
-              title="Search events"
-            >
-              <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="day-tasks-list">
-          {selectedDayTasks.length === 0 ? (
-            <p className="empty-tasks">No events scheduled</p>
-          ) : (
-            selectedDayTasks.map(task => {
-              let displayTime = `${formatToLocalTime(task.start_time)} - ${formatToLocalTime(task.end_time)}`;
-              if (task.taskType === 'task-start') displayTime = `Start ${formatToLocalTime(task.start_time)}`;
-              else if (task.taskType === 'task-end') displayTime = `End ${formatToLocalTime(task.end_time)}`;
-              else if (task.taskType === 'task-middle') displayTime = 'Continued';
-
-              return (
-                <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
-                  <div className="task-time">
-                    {displayTime}
-                  </div>
-                  <div className="task-content">
-                    <h4>{task.title}</h4>
-                  </div>
-                  <div className="task-actions">
-                    <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
-                    <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Review Modal Overlay */}
-      {
-        status === 'preview' && (
-          <div className="review-overlay">
-            <div className="review-modal">
-              <div className="review-header">
-                <div className="header-top">
-                  <h2>Review Events</h2>
-                  <button onClick={reset} className="close-btn">✕</button>
-                </div>
-                <p className="sub-header">{candidates.length} events created</p>
+                <textarea
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleParse();
+                    }
+                  }}
+                  placeholder="e.g., Team meeting tomorrow at 2pm, then dinner at 6pm and a Dentist appointment next Monday..."
+                  rows={3}
+                  style={{ margin: 0 }} /* Remove margin since wrapper handles gap */
+                />
               </div>
+              <div className="input-actions">
+                <button
+                  className="create-btn"
+                  onClick={handleParse}
+                  disabled={!rawText.trim() || status === 'loading'}
+                >
+                  {status === 'loading' ? 'Processing...' : 'Create Events'}
+                </button>
+                <button
+                  className={`mic-btn ${isRecording ? 'recording' : ''}`}
+                  onClick={handleRecord}
+                  style={{ backgroundColor: isRecording ? '#EF4444' : undefined }}
+                >
+                  {isRecording ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="0" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {errorMsg && <p className="error-msg">{errorMsg}</p>}
+            </div>
 
-              <div className="review-body">
-                {candidates.map((candidate) => (
-                  <div key={candidate.id} className={`review-item-card ${candidate.command_type === 'AMBIGUITY' ? 'ambiguity-item' : ''}`}>
-                    {/* Event Title */}
-                    <h3 className="event-title">
-                      {candidate.parameters?.title && candidate.parameters.title !== 'CREATE_TASK'
-                        ? candidate.parameters.title
-                        : (candidate.description !== 'CREATE_TASK' ? candidate.description : 'New Event')}
-                    </h3>
+            {/* Home: Calendar Dashboard Card */}
+            <div className="calendar-dashboard-card">
+              <h2 className="section-header">Upcoming Events</h2>
+              <CalendarStrip
+                tasks={calendarTasks}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+              />
+            </div>
 
-                    {/* Event Details */}
-                    <div className="event-details">
-                      <div className="detail-row">
-                        <span className="detail-icon">📅</span>
-                        <span className="detail-text">
-                          {candidate.parameters.start_time
-                            ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                            : 'No date'}
-                        </span>
+            <div className="day-tasks-header">
+              <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule ({selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })})</h3>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <span className="event-badge">{selectedDayTasks.length} events</span>
+                <button
+                  className="search-btn"
+                  onClick={handleSearchOpen}
+                  title="Search events"
+                >
+                  <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="day-tasks-list">
+              {selectedDayTasks.length === 0 ? (
+                <p className="empty-tasks">No events scheduled</p>
+              ) : (
+                selectedDayTasks.map(task => {
+                  let displayTime = `${formatToLocalTime(task.start_time, preferences?.time_format_24h)} - ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
+                  if (task.taskType === 'task-start') displayTime = `Start ${formatToLocalTime(task.start_time, preferences?.time_format_24h)}`;
+                  else if (task.taskType === 'task-end') displayTime = `End ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
+                  else if (task.taskType === 'task-middle') displayTime = 'Continued';
+
+                  return (
+                    <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
+                      <div className="task-time">
+                        {displayTime}
                       </div>
-                      <div className="detail-row">
-                        <span className="detail-icon">🕒</span>
-                        <span className="detail-text">
-                          {candidate.parameters.start_time ? (
-                            <>
-                              {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time))}
-                              {candidate.parameters.end_time && (
-                                <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time))}</>
-                              )}
-                            </>
-                          ) : 'No time'}
-                        </span>
+                      <div className="task-content">
+                        <h4>{task.title}</h4>
+                      </div>
+                      <div className="task-actions">
+                        <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
+                        <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Review Modal Overlay */}
+          {
+            status === 'preview' && (
+              <div className="review-overlay">
+                <div className="review-modal">
+                  <div className="review-header">
+                    <div className="header-top">
+                      <h2>Review Events</h2>
+                      <button onClick={reset} className="close-btn">✕</button>
+                    </div>
+                    <p className="sub-header">{candidates.length} events created</p>
+                  </div>
+
+                  <div className="review-body">
+                    {candidates.map((candidate) => (
+                      <div key={candidate.id} className={`review-item-card ${candidate.command_type === 'AMBIGUITY' ? 'ambiguity-item' : ''}`}>
+                        {/* Event Title */}
+                        <h3 className="event-title">
+                          {candidate.parameters?.title && candidate.parameters.title !== 'CREATE_TASK'
+                            ? candidate.parameters.title
+                            : (candidate.description !== 'CREATE_TASK' ? candidate.description : 'New Event')}
+                        </h3>
+
+                        {/* Event Details */}
+                        <div className="event-details">
+                          <div className="detail-row">
+                            <span className="detail-icon">📅</span>
+                            <span className="detail-text">
+                              {candidate.parameters.start_time
+                                ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                : 'No date'}
+                            </span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-icon">🕒</span>
+                            <span className="detail-text">
+                              {candidate.parameters.start_time ? (
+                                <>
+                                  {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time), preferences?.time_format_24h)}
+                                  {candidate.parameters.end_time && (
+                                    <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time), preferences?.time_format_24h)}</>
+                                  )}
+                                </>
+                              ) : 'No time'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Content Area (Ambiguity OR Actions) */}
+                        {candidate.command_type === 'AMBIGUITY' ? (
+                          <div className="ambiguity-content">
+                            <h4>
+                              {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
+                                ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time), preferences?.time_format_24h)}. What would you like to do?`
+                                : candidate.parameters.message}
+                            </h4>
+                            <div className="ambiguity-opts">
+                              {candidate.parameters.options?.map((opt, i) => {
+                                let label = opt.label;
+                                if (opt.suggested && opt.display_time) {
+                                  const startStr = formatToLocalTime(normalizeToUTC(opt.display_time), preferences?.time_format_24h);
+                                  const endStr = opt.end_time ? formatToLocalTime(normalizeToUTC(opt.end_time), preferences?.time_format_24h) : '';
+                                  label = `⭐ Suggested time: ${startStr}${endStr ? ' - ' + endStr : ''}`;
+                                }
+
+                                return (
+                                  <button key={i} onClick={async () => {
+                                    let val = {};
+                                    try { val = JSON.parse(opt.value) } catch (e) { }
+
+                                    if (val.discard) {
+                                      await jobService.deleteJobCandidate(candidate.id);
+                                      await refreshPreview(jobId);
+                                      return;
+                                    }
+
+                                    if (val.keep_both) {
+                                      const replaceOption = candidate.parameters.options?.find(o => {
+                                        try {
+                                          const parsed = JSON.parse(o.value);
+                                          return parsed.remove_task_id;
+                                        } catch { return false; }
+                                      });
+                                      let existingTaskId = null;
+                                      if (replaceOption) {
+                                        try {
+                                          existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
+                                        } catch { }
+                                      }
+
+                                      const existingTask = calendarTasks.find(t => t.id === existingTaskId);
+                                      const newTaskTime = (val.start_time || candidate.parameters.start_time)
+                                        ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time), preferences?.time_format_24h)
+                                        : '09:00';
+                                      const existingTaskTime = existingTask?.start_time
+                                        ? formatToLocalTime(normalizeToUTC(existingTask.start_time), preferences?.time_format_24h)
+                                        : '09:00';
+
+                                      setConflictModal({
+                                        isOpen: true,
+                                        newTask: {
+                                          title: val.title,
+                                          start_time: val.start_time,
+                                          end_time: val.end_time,
+                                          candidateId: candidate.id
+                                        },
+                                        existingTask: existingTask ? {
+                                          id: existingTask.id,
+                                          title: existingTask.title,
+                                          start_time: existingTask.start_time,
+                                          end_time: existingTask.end_time
+                                        } : null,
+                                        newTaskTime,
+                                        existingTaskTime,
+                                        newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
+                                        existingTaskDate: existingTask?.start_time ? toLocalISOString(new Date(existingTask.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0]
+                                      });
+                                      return;
+                                    }
+
+                                    if (val.remove_task_id) {
+                                      try {
+                                        await jobService.deleteTask(val.remove_task_id);
+                                      } catch (e) {
+                                        console.error("Failed to delete conflicting task", e);
+                                      }
+                                    }
+
+                                    const newTitle = val.title || candidate.description.replace('Conflict: ', '').replace('Ambiguity: ', '');
+                                    const updated = await jobService.updateJobCandidate(candidate.id, {
+                                      description: newTitle,
+                                      command_type: 'CREATE_TASK',
+                                      parameters: {
+                                        title: newTitle,
+                                        start_time: val.start_time,
+                                        end_time: val.end_time,
+                                        description: val.description
+                                      }
+                                    });
+
+                                    if (updated.command_type !== 'AMBIGUITY') {
+                                      await finalizeAcceptance(candidate.id);
+                                    } else {
+                                      await refreshPreview(jobId);
+                                    }
+                                  }}>{label}</button>
+                                )
+                              })}
+                              <button className="other-opt-btn" onClick={() => {
+                                let prefillStart = new Date();
+                                let prefillEnd = null;
+                                let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
+
+                                if (candidate.parameters.options?.length > 0) {
+                                  try {
+                                    const firstOpt = JSON.parse(candidate.parameters.options[0].value);
+                                    if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
+                                    if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
+                                    if (firstOpt.title) prefillTitle = firstOpt.title;
+                                  } catch (e) { console.error("Failed to parse first option", e); }
+                                }
+
+                                if (!prefillEnd) {
+                                  prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
+                                }
+
+                                handleEditOpen({
+                                  id: candidate.id,
+                                  description: prefillTitle,
+                                  parameters: {
+                                    ...candidate.parameters,
+                                    title: prefillTitle,
+                                    start_time: prefillStart.toISOString(),
+                                    end_time: prefillEnd.toISOString()
+                                  }
+                                }, 'candidate');
+                              }}>Other</button>
+                              <div style={{ flex: 1 }}></div>
+                              <button className="ambiguity-reject-btn" onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: 'Reject Event',
+                                  message: 'Are you sure you want to reject this event?',
+                                  isDestructive: true,
+                                  onConfirm: async () => {
+                                    await jobService.deleteJobCandidate(candidate.id);
+                                    await refreshPreview(jobId);
+                                    closeConfirm();
+                                  }
+                                });
+                              }}>Reject</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="event-actions">
+                            <button className="action-btn reject-btn" onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                title: 'Reject Event',
+                                message: 'Are you sure you want to reject this event?',
+                                isDestructive: true,
+                                onConfirm: async () => {
+                                  await jobService.deleteJobCandidate(candidate.id);
+                                  await refreshPreview(jobId);
+                                  closeConfirm();
+                                }
+                              });
+                            }}>Reject</button>
+                            <button className="action-btn edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
+                            <button className="action-btn accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="review-footer">
+                    <button className="footer-reject" onClick={() => {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: 'Reject All Events',
+                        message: 'Are you sure you want to reject all these events? This action cannot be undone.',
+                        isDestructive: true,
+                        onConfirm: () => {
+                          reset();
+                          closeConfirm();
+                        }
+                      });
+                    }}>Reject All</button>
+                    <button className="footer-accept" onClick={handleAccept}>Accept All</button>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
+          {/* Toast */}
+          {
+            showToast && (
+              <div className="toast">
+                Event added!
+              </div>
+            )
+          }
+
+          {/* Conflict Resolution Modal */}
+          {
+            conflictModal.isOpen && (
+              <div className="review-overlay">
+                <div className="conflict-modal">
+                  <div className="conflict-header">
+                    <h2>Resolve Time Conflict</h2>
+                    <button className="close-btn" onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}>×</button>
+                  </div>
+                  <p className="conflict-subtext">Adjust the times for these overlapping events:</p>
+
+                  <div className="conflict-tasks">
+                    {/* New Task */}
+                    <div className="conflict-task-card new-task">
+                      <div className="task-badge new">New</div>
+                      <h4>{conflictModal.newTask?.title || 'New Task'}</h4>
+                      <div className="edit-time-container attention-sparkle">
+                        <div className="edit-time-row-split">
+                          <label>Start</label>
+                          <div className="split-inputs">
+                            <input
+                              type="date"
+                              className="edit-field date-input"
+                              value={conflictModal.newTaskDate}
+                              onChange={(e) => setConflictModal(prev => ({ ...prev, newTaskDate: e.target.value }))}
+                            />
+                            <div className="time-control-group">
+                              <div className="arrow-stack">
+                                <button className="arrow-btn" onClick={() => {
+                                  const shifted = handleTimeShift(conflictModal.newTaskTime, 30);
+                                  setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
+                                }}>▲</button>
+                                <button className="arrow-btn" onClick={() => {
+                                  const shifted = handleTimeShift(conflictModal.newTaskTime, -30);
+                                  setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
+                                }}>▼</button>
+                              </div>
+                              <input
+                                className="time-input-styled"
+                                type="time"
+                                value={conflictModal.newTaskTime}
+                                onChange={(e) => setConflictModal(prev => ({ ...prev, newTaskTime: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Content Area (Ambiguity OR Actions) */}
-                    {candidate.command_type === 'AMBIGUITY' ? (
-                      <div className="ambiguity-content">
-                        <h4>
-                          {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
-                            ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time))}. What would you like to do?`
-                            : candidate.parameters.message}
-                        </h4>
-                        <div className="ambiguity-opts">
-                          {candidate.parameters.options?.map((opt, i) => (
-                            <button key={i} onClick={async () => {
-                              let val = {};
-                              try { val = JSON.parse(opt.value) } catch (e) { }
-
-                              if (val.discard) {
-                                await jobService.deleteJobCandidate(candidate.id);
-                                await refreshPreview(jobId);
-                                return;
-                              }
-
-                              if (val.keep_both) {
-                                const replaceOption = candidate.parameters.options?.find(o => {
-                                  try {
-                                    const parsed = JSON.parse(o.value);
-                                    return parsed.remove_task_id;
-                                  } catch { return false; }
-                                });
-                                let existingTaskId = null;
-                                if (replaceOption) {
-                                  try {
-                                    existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
-                                  } catch { }
-                                }
-
-                                const existingTask = calendarTasks.find(t => t.id === existingTaskId);
-                                const newTaskTime = (val.start_time || candidate.parameters.start_time)
-                                  ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time))
-                                  : '09:00';
-                                const existingTaskTime = existingTask?.start_time
-                                  ? formatToLocalTime(normalizeToUTC(existingTask.start_time))
-                                  : '09:00';
-
-                                setConflictModal({
-                                  isOpen: true,
-                                  newTask: {
-                                    title: val.title,
-                                    start_time: val.start_time,
-                                    end_time: val.end_time,
-                                    candidateId: candidate.id
-                                  },
-                                  existingTask: existingTask ? {
-                                    id: existingTask.id,
-                                    title: existingTask.title,
-                                    start_time: existingTask.start_time,
-                                    end_time: existingTask.end_time
-                                  } : null,
-                                  newTaskTime,
-                                  existingTaskTime,
-                                  newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
-                                  existingTaskDate: existingTask?.start_time ? toLocalISOString(new Date(existingTask.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0]
-                                });
-                                return;
-                              }
-
-                              if (val.remove_task_id) {
-                                try {
-                                  await jobService.deleteTask(val.remove_task_id);
-                                } catch (e) {
-                                  console.error("Failed to delete conflicting task", e);
-                                }
-                              }
-
-                              const newTitle = val.title || candidate.description.replace('Conflict: ', '').replace('Ambiguity: ', '');
-                              const updated = await jobService.updateJobCandidate(candidate.id, {
-                                description: newTitle,
-                                command_type: 'CREATE_TASK',
-                                parameters: {
-                                  title: newTitle,
-                                  start_time: val.start_time,
-                                  end_time: val.end_time,
-                                  description: val.description
-                                }
-                              });
-
-                              if (updated.command_type !== 'AMBIGUITY') {
-                                await finalizeAcceptance(candidate.id);
-                              } else {
-                                await refreshPreview(jobId);
-                              }
-                            }}>{opt.label}</button>
-                          ))}
-                          <button className="other-opt-btn" onClick={() => {
-                            let prefillStart = new Date();
-                            let prefillEnd = null;
-                            let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
-
-                            if (candidate.parameters.options?.length > 0) {
-                              try {
-                                const firstOpt = JSON.parse(candidate.parameters.options[0].value);
-                                if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
-                                if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
-                                if (firstOpt.title) prefillTitle = firstOpt.title;
-                              } catch (e) { console.error("Failed to parse first option", e); }
-                            }
-
-                            if (!prefillEnd) {
-                              prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
-                            }
-
-                            handleEditOpen({
-                              id: candidate.id,
-                              description: prefillTitle,
-                              parameters: {
-                                ...candidate.parameters,
-                                title: prefillTitle,
-                                start_time: prefillStart.toISOString(),
-                                end_time: prefillEnd.toISOString()
-                              }
-                            }, 'candidate');
-                          }}>Other</button>
-                          <div style={{ flex: 1 }}></div>
-                          <button className="ambiguity-reject-btn" onClick={() => {
-                            setConfirmModal({
-                              isOpen: true,
-                              title: 'Reject Event',
-                              message: 'Are you sure you want to reject this event?',
-                              isDestructive: true,
-                              onConfirm: async () => {
-                                await jobService.deleteJobCandidate(candidate.id);
-                                await refreshPreview(jobId);
-                                closeConfirm();
-                              }
-                            });
-                          }}>Reject</button>
+                    {/* Existing Task */}
+                    {conflictModal.existingTask && (
+                      <div className="conflict-task-card existing-task">
+                        <div className="task-badge existing">Existing</div>
+                        <h4>{conflictModal.existingTask?.title || 'Existing Task'}</h4>
+                        <div className="edit-time-container attention-sparkle">
+                          <div className="edit-time-row-split">
+                            <label>Start</label>
+                            <div className="split-inputs">
+                              <input
+                                type="date"
+                                className="edit-field date-input"
+                                value={conflictModal.existingTaskDate}
+                                onChange={(e) => setConflictModal(prev => ({ ...prev, existingTaskDate: e.target.value }))}
+                              />
+                              <div className="time-control-group">
+                                <div className="arrow-stack">
+                                  <button className="arrow-btn" onClick={() => {
+                                    const shifted = handleTimeShift(conflictModal.existingTaskTime, 30);
+                                    setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
+                                  }}>▲</button>
+                                  <button className="arrow-btn" onClick={() => {
+                                    const shifted = handleTimeShift(conflictModal.existingTaskTime, -30);
+                                    setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
+                                  }}>▼</button>
+                                </div>
+                                <input
+                                  className="time-input-styled"
+                                  type="time"
+                                  value={conflictModal.existingTaskTime}
+                                  onChange={(e) => setConflictModal(prev => ({ ...prev, existingTaskTime: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="event-actions">
-                        <button className="action-btn reject-btn" onClick={() => {
-                          setConfirmModal({
-                            isOpen: true,
-                            title: 'Reject Event',
-                            message: 'Are you sure you want to reject this event?',
-                            isDestructive: true,
-                            onConfirm: async () => {
-                              await jobService.deleteJobCandidate(candidate.id);
-                              await refreshPreview(jobId);
-                              closeConfirm();
-                            }
-                          });
-                        }}>Reject</button>
-                        <button className="action-btn edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
-                        <button className="action-btn accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-
-              <div className="review-footer">
-                <button className="footer-reject" onClick={() => {
-                  setConfirmModal({
-                    isOpen: true,
-                    title: 'Reject All Events',
-                    message: 'Are you sure you want to reject all these events? This action cannot be undone.',
-                    isDestructive: true,
-                    onConfirm: () => {
-                      reset();
-                      closeConfirm();
-                    }
-                  });
-                }}>Reject All</button>
-                <button className="footer-accept" onClick={handleAccept}>Accept All</button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* Toast */}
-      {
-        showToast && (
-          <div className="toast">
-            Event added!
-          </div>
-        )
-      }
-
-      {/* Conflict Resolution Modal */}
-      {
-        conflictModal.isOpen && (
-          <div className="review-overlay">
-            <div className="conflict-modal">
-              <div className="conflict-header">
-                <h2>Resolve Time Conflict</h2>
-                <button className="close-btn" onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}>×</button>
-              </div>
-              <p className="conflict-subtext">Adjust the times for these overlapping events:</p>
-
-              <div className="conflict-tasks">
-                {/* New Task */}
-                <div className="conflict-task-card new-task">
-                  <div className="task-badge new">New</div>
-                  <h4>{conflictModal.newTask?.title || 'New Task'}</h4>
-                  <div className="edit-time-container attention-sparkle">
-                    <div className="edit-time-row-split">
-                      <label>Start</label>
-                      <div className="split-inputs">
-                        <input
-                          type="date"
-                          className="edit-field date-input"
-                          value={conflictModal.newTaskDate}
-                          onChange={(e) => setConflictModal(prev => ({ ...prev, newTaskDate: e.target.value }))}
-                        />
-                        <div className="time-control-group">
-                          <div className="arrow-stack">
-                            <button className="arrow-btn" onClick={() => {
-                              const shifted = handleTimeShift(conflictModal.newTaskTime, 30);
-                              setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
-                            }}>▲</button>
-                            <button className="arrow-btn" onClick={() => {
-                              const shifted = handleTimeShift(conflictModal.newTaskTime, -30);
-                              setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
-                            }}>▼</button>
-                          </div>
-                          <input
-                            className="time-input-styled"
-                            type="time"
-                            value={conflictModal.newTaskTime}
-                            onChange={(e) => setConflictModal(prev => ({ ...prev, newTaskTime: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  <div className="conflict-actions">
+                    <button
+                      className="conflict-cancel"
+                      onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}
+                    >
+                      Cancel
+                    </button>
+                    {conflictModal.showForceSave && (
+                      <button
+                        className="conflict-save-anyway"
+                        style={{ backgroundColor: '#ff9800', marginRight: '10px' }}
+                        onClick={() => handleSaveConflict(true)}
+                      >
+                        Save Anyway
+                      </button>
+                    )}
+                    <button
+                      className="conflict-save"
+                      onClick={() => handleSaveConflict(false)}
+                    >
+                      Save Changes
+                    </button>
                   </div>
                 </div>
+              </div>
+            )
+          }
 
-                {/* Existing Task */}
-                {conflictModal.existingTask && (
-                  <div className="conflict-task-card existing-task">
-                    <div className="task-badge existing">Existing</div>
-                    <h4>{conflictModal.existingTask?.title || 'Existing Task'}</h4>
-                    <div className="edit-time-container attention-sparkle">
-                      <div className="edit-time-row-split">
-                        <label>Start</label>
-                        <div className="split-inputs">
-                          <input
-                            type="date"
-                            className="edit-field date-input"
-                            value={conflictModal.existingTaskDate}
-                            onChange={(e) => setConflictModal(prev => ({ ...prev, existingTaskDate: e.target.value }))}
-                          />
-                          <div className="time-control-group">
-                            <div className="arrow-stack">
-                              <button className="arrow-btn" onClick={() => {
-                                const shifted = handleTimeShift(conflictModal.existingTaskTime, 30);
-                                setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
-                              }}>▲</button>
-                              <button className="arrow-btn" onClick={() => {
-                                const shifted = handleTimeShift(conflictModal.existingTaskTime, -30);
-                                setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
-                              }}>▼</button>
-                            </div>
-                            <input
-                              className="time-input-styled"
-                              type="time"
-                              value={conflictModal.existingTaskTime}
-                              onChange={(e) => setConflictModal(prev => ({ ...prev, existingTaskTime: e.target.value }))}
-                            />
-                          </div>
+          {/* Unified Edit Modal */}
+          <EditEventModal
+            isOpen={editModal.isOpen}
+            onClose={handleEditClose}
+            onSave={handleEditSave}
+            event={editModal.event}
+            type={editModal.type}
+          />
+
+          {/* Confirmation Modal */}
+          <ConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={confirmModal.title}
+            message={confirmModal.message}
+            confirmText={confirmModal.isDestructive ? 'Delete' : 'Confirm'}
+            isDestructive={confirmModal.isDestructive}
+            onConfirm={confirmModal.onConfirm}
+            onCancel={closeConfirm}
+          />
+
+          {/* Search Modal */}
+          {searchModal.isOpen && (
+            <div className="modal-overlay" onClick={handleSearchClose}>
+              <div className="search-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="search-header">
+                  <h3>Search Events</h3>
+                  <button className="close-btn" onClick={handleSearchClose}>×</button>
+                </div>
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Search by event title..."
+                  value={searchModal.query}
+                  onChange={(e) => handleSearchQuery(e.target.value)}
+                  autoFocus
+                />
+                <div className="search-results">
+                  {searchModal.query && searchModal.results.length === 0 && (
+                    <p className="no-results">No events found</p>
+                  )}
+                  {searchModal.results.map(task => {
+                    const startDate = new Date(normalizeToUTC(task.start_time));
+                    const endDate = new Date(normalizeToUTC(task.end_time));
+                    const startDateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isMultiDay = startDateStr !== endDateStr;
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="search-result-item"
+                        onClick={() => handleSelectSearchResult(task)}
+                      >
+                        <div className="result-title">{task.title}</div>
+                        <div className="result-date">
+                          {isMultiDay ? (
+                            <>
+                              {startDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                              })} {formatToLocalTime(task.start_time)}
+                              {' → '}
+                              {endDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                              })} {formatToLocalTime(task.end_time)}
+                            </>
+                          ) : (
+                            <>
+                              {startDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                              })} at {formatToLocalTime(task.start_time)}
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="conflict-actions">
-                <button
-                  className="conflict-cancel"
-                  onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}
-                >
-                  Cancel
-                </button>
-                {conflictModal.showForceSave && (
-                  <button
-                    className="conflict-save-anyway"
-                    style={{ backgroundColor: '#ff9800', marginRight: '10px' }}
-                    onClick={() => handleSaveConflict(true)}
-                  >
-                    Save Anyway
-                  </button>
-                )}
-                <button
-                  className="conflict-save"
-                  onClick={() => handleSaveConflict(false)}
-                >
-                  Save Changes
-                </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        )
-      }
+          )}
+        </>
+      )}
 
-      {/* Unified Edit Modal */}
-      <EditEventModal
-        isOpen={editModal.isOpen}
-        onClose={handleEditClose}
-        onSave={handleEditSave}
-        event={editModal.event}
-        type={editModal.type}
-      />
-
-      {/* Confirmation Modal */}
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        confirmText={confirmModal.isDestructive ? 'Delete' : 'Confirm'}
-        isDestructive={confirmModal.isDestructive}
-        onConfirm={confirmModal.onConfirm}
-        onCancel={closeConfirm}
-      />
-
-      {/* Search Modal */}
-      {searchModal.isOpen && (
-        <div className="modal-overlay" onClick={handleSearchClose}>
-          <div className="search-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="search-header">
-              <h3>Search Events</h3>
-              <button className="close-btn" onClick={handleSearchClose}>×</button>
-            </div>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search by event title..."
-              value={searchModal.query}
-              onChange={(e) => handleSearchQuery(e.target.value)}
-              autoFocus
-            />
-            <div className="search-results">
-              {searchModal.query && searchModal.results.length === 0 && (
-                <p className="no-results">No events found</p>
-              )}
-              {searchModal.results.map(task => {
-                const startDate = new Date(normalizeToUTC(task.start_time));
-                const endDate = new Date(normalizeToUTC(task.end_time));
-                const startDateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const isMultiDay = startDateStr !== endDateStr;
-
-                return (
-                  <div
-                    key={task.id}
-                    className="search-result-item"
-                    onClick={() => handleSelectSearchResult(task)}
-                  >
-                    <div className="result-title">{task.title}</div>
-                    <div className="result-date">
-                      {isMultiDay ? (
-                        <>
-                          {startDate.toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric'
-                          })} {formatToLocalTime(task.start_time)}
-                          {' → '}
-                          {endDate.toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric'
-                          })} {formatToLocalTime(task.end_time)}
-                        </>
-                      ) : (
-                        <>
-                          {startDate.toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric'
-                          })} at {formatToLocalTime(task.start_time)}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      {activePage === 'preferences' && (
+        <div style={{ marginTop: '80px', padding: '20px', maxWidth: '900px', margin: '80px auto 0' }}>
+          <PreferencesPage
+            isPage={true}
+            preferences={preferences}
+            setPreferences={setPreferences}
+          />
         </div>
       )}
     </>

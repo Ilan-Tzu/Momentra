@@ -20,17 +20,20 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 
 ### Intelligent Conflict Management
 - **Real-time conflict detection**: Knows when you're double-booked before you save
-- **Smart resolution UI**: Clear visual comparison of conflicting tasks
-- **Flexible override**: Force-save when you need to (with a warning system)
+- **Smart Fix Suggestions**: One-click "Suggested Time" slot finding based on your buffer and work hours
 - **Recursive conflict checking**: Handles cascading schedule changes
 - **Non-Blocking Logic**: Intelligently distinguishes between logistical backdrops (Airbnb, Hotels) and rigid commitments (Flights, Meetings)
 
+### Personalized AI Intelligence
+- **Deep Personal Context**: Tell the AI who you are and how you work (e.g. "I'm a morning person", "I travel often") to influence scheduling decisions
+- **Customizable AI Behavior**: Adjust AI temperature/creativity and specify personal rules
+- **Scheduling Discipline**: Fine-tune buffer times, default event durations, and working hours
+
 ### Premium User Experience
 - **Glassmorphism design**: Modern, elegant UI with blur effects and gradients
+- **Dual-Mode UI**: Seamlessly switch between focus-driven Modal views and comprehensive Full-Page dashboards
 - **Smooth interactions**: Animated calendar strip with auto-centering on selected dates
-- **Inline editing**: Click to edit tasks directly on the calendar
-- **Multi-day flow**: Visual bars in the strip and connecting vertical lines in the day view for events that span days
-- **Modular Themes**: Modular design with unique skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), and Review (Purple Glass) modes
+- **Modular Themes**: Specialized skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), and Review (Purple Glass) modes
 - **Google Sign-In**: Seamless authentication with OAuth 2.0
 
 ---
@@ -70,76 +73,40 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - [x] Voice input with transcription
 - [x] Google Sign-In authentication
 - [x] Timezone-aware UTC conversion
-- [x] **Premium Amber-Gold Conflict Resolution UI**
-  - [x] Vertical task stack for clear comparison
+- [x] **Smart User Preferences System**
+  - [x] **Scheduling**: Custom buffer times, work hours, and default durations
+  - [x] **AI Behavior**: Adjustable temperature and free-form personal context
+  - [x] **Display**: 24h/12h time format and First Day of Week settings
+  - [x] **Persistence**: Synced across sessions via dedicated backend storage
+- [x] **Intelligent Conflict Resolution**
+  - [x] **Smart Suggested Slots**: Automatically finds the nearest free gap respecting buffer and work hours
+  - [x] **Amber-Gold Conflict UI**: Vertical task stack for clear comparison
   - [x] "Save Anyway" override with pulse animation
-  - [x] Strict time validation (End > Start)
 - **[x] Multi-Day Task Visualization**
-  - [x] **Proportional Bars**: Bar length and position now reflect exact hours (8 AM start shows longer bar than 8 PM)
-  - [x] **Vertical Connectors**: Task list shows "Start", "Continued", and "End" segments with visual connecting lines
-  - [x] **Range Filtering**: Tasks spanning across days are tracked and displayed on every inhabited day
+  - [x] **Proportional Bars**: Bar length and position now reflect exact hours
+  - [x] **Vertical Connectors**: Task list shows "Start", "Continued", and "End" segments with visual links
 - [x] **Non-Blocking Task Support**
-  - [x] **Database Attribute**: `is_blocking` flag on all tasks
-  - [x] **Logistical Bypass**: "Airbnb", "Stay", and "Hotel" events are non-blocking—meetings can be scheduled during them without conflict
-  - [x] **Rigid Enforcement**: "Flights" and "Appointments" remain blocking to ensure no double-booking
+  - [x] Logistical Bypass: "Airbnb", "Stay", and "Hotel" events are non-blocking
+  - [x] Rigid Enforcement: "Flights" and "Appointments" remain blocking
 - [x] **Stay Ambiguity Handling**
-  - [x] Automatic detection of Airbnb/Hotel/Stay keywords without times
-  - [x] "Educated Guess" options for standard check-in (3pm) and check-out (11am)
-  - [x] Intelligent "Other" pre-fill: Carries over AI-suggested dates/times into the manual editor
+  - [x] Automatic detection of accommodation keywords
+  - [x] "Educated Guess" options (Check-in 3pm / Check-out 11am)
 - [x] **Unified Event Editing**
-  - [x] **Cyber-Industrial Theme**: Specialized Sapphire/Indigo theme for the Edit Modal
-  - [x] **Sparkle Animations**: Shimmer/Sweep effects on time inputs to guide user attention
-  - [x] **Auto-Follow Logic**: Calendar automatically jumps to the new date after a task is rescheduled
-  - [x] Split date/time inputs with adjustment arrows
-  - [x] Duration persistence logic
-- [x] Time ambiguity handling (AM/PM clarification)
-- [x] **Sleek Calendar Strip**
-  - [x] High-density 30-day view (Thinned for better space efficiency)
-  - [x] **Polarized Layout**: Dates pinned to top, event strips to bottom for maximum visual clarity
-  - [x] Task dots indicator (up to 3 per day)
-  - [x] Smooth scrolling calendar navigation
-- [x] Glassmorphism UI design
-- [x] **Vibrant Login Page**
-  - [x] "Zen" drift animation with motion trails
-  - [x] Elastic block physics
-  - [x] Deep gradient aesthetics
-- [x] **Standardized Environment Configuration**
-  - [x] Backend: Centralized `pydantic-settings` with type safety
-  - [x] Frontend: Vite environment modes (.env.development / .env.production)
-  - [x] Secure Google OAuth client ID handling
-- [x] **Comprehensive Testing Infrastructure**
-  - [x] Backend: `pytest` with async support and database fixtures
-  - [x] Backend: AI prompt logic validation using mocks
-  - [x] Frontend: `Vitest` + React Testing Library (modern Jest alternative)
-  - [x] E2E: `Playwright` integration for resilient UI testing
-- [x] **Security Hardening**
-  - [x] Input sanitization with `bleach` (Strips HTML/XSS from all user inputs)
-  - [x] HTTPS enforcement (Configurable middleware for secure communication)
-  - [x] Trusted host validation (Prevents host header injection)
-- [x] **API Rate Limiting & Caching**
-  - [x] Rate limiting with `slowapi` (10/min auth, 20/min AI endpoints)
-  - [x] LLM response caching (1hr TTL, 30% cost reduction)
-  - [x] Transcription caching (30min TTL, audio content hashing)
-  - [x] Cache statistics endpoint for monitoring
+  - [x] Cyber-Industrial Theme Modal
+  - [x] Auto-Follow Logic: Portal jumps to the new date after rescheduling
 - [x] **Mobile Responsiveness & PWA**
-  - [x] Adaptive layouts (Mobile/Tablet/Desktop breakpoints)
-  - [x] Touch-friendly interactions (44px tap targets, active states)
-  - [x] PWA manifest with app icons
-  - [x] Service worker for offline support
-  - [x] Safe area insets for notched phones
-- [x] Reduced motion accessibility support
-- [x] **JWT Authentication & Session Management**
-  - [x] Short-lived access tokens (15min)
-  - [x] Long-lived refresh tokens (7 days) with background auto-refresh
-  - [x] Ownership enforcement on all protected routes
-  - [x] Secure token management in frontend (Axios interceptors)
+  - [x] Adaptive layouts & PWA manifest
+  - [x] Notch-safe design for modern devices
+- [x] **Security & Performance**
+  - [x] Rate limiting & LLM/Transcription caching
+  - [x] JWT with auto-background token refresh
+  - [x] Input sanitization with `bleach`
 
 ### 🔧 Core Components
 - **LoginPage**: Google OAuth with floating calendar animations
 - **Navbar**: App navigation and logout
-- **CalendarStrip**: Horizontal date selector with task indicators
-- **Task Management**: Create, read, update, delete operations
-- **EditEventModal**: Unified interface for editing tasks and preview candidates
+- **CalendarStrip**: Horizontal date selector with multi-lane task indicators
+- **PreferencesPage**: Tabbed settings (Scheduling, AI, Display) with debounced auto-save
 - **ConflictModal**: High-gravity visual conflict resolution interface
 - **PreviewModal**: LLM-generated task review before acceptance
 
@@ -164,21 +131,8 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
    - Customizable reminder times
 
 3. **Templates**
-   - Create templates for recurring events (Template Events) which are stored differently from normal events.
-   - Detect templates from user input (e.g tommorow is a rest day, or tommorow is a gym day, or tommorow is a work day).
-   - Functions on Template Events for mass removal, replacement, or insertion of Template Events.
-
-5. **User Preferences**
-   - Default task duration
-   - Work hours
-   - Timezone selection
-   - Theme customization
-
-6. **Enhanced AI Features**
-    - Task prioritization suggestions
-    - Smart scheduling (find best time slot)
-    - Meeting preparation summaries
-    - Context-aware task grouping
+   - Create templates for recurring patterns (Gym Day, Work Day, etc.)
+   - Mass removal/insertion of template-driven events
 
 ### Lower Priority
 7. **Search & Filter**
@@ -187,93 +141,64 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
     - Tag-based organization
 
 8. **Analytics Dashboard**
-    - Time tracking
-    - Productivity insights
-    - Task completion rates
+    - Time tracking & productivity insights
 
 8. **Collaboration**
-    - Shared calendars
-    - Team scheduling
-    - Meeting polls
+    - Shared calendars & Team scheduling
 
 
 ---
 
 ## 🏁 Distance from Production
 
-### Current Status: **Alpha (75% Production-Ready)**
+### Current Status: **Alpha (85% Production-Ready)**
 
 #### What's Production-Ready ✅
-- Core scheduling logic
-- AI parsing with timezone handling
-- Google OAuth authentication
-- Conflict detection algorithm
-- UTC conversion system
-- Frontend UI/UX foundation
-- Database Schema (PostgreSQL + Alembic)
-- Error Handling & Logging
-- **Standardized Multi-Environment Configuration**
-- **Comprehensive Testing Suite (AI, API, UI)**
-- **API Rate Limiting & Caching**
-- **Security Hardening (HTTPS & Sanitization)**
-- **Mobile Responsiveness & PWA**
+- Core scheduling & AI parsing logic
+- Complex conflict detection & smart fix engine
+- User preference system (Scheduling + AI Context)
+- Google OAuth & JWT refresh mechanism
+- PWA & Mobile support
+- Testing suite (AI, API, UI)
+- Security Hardening
 
 #### Critical Gaps 🚧
-- **Infrastructure** (4/10)
-  - Production database setup (PostgreSQL ready) ✅
-  - Multi-env Config (Dev/Prod) ✅
+- **Infrastructure** (5/10)
   - No deployment configuration (Docker/K8s) ❌
   - No CI/CD pipeline ❌
   - No monitoring/alerting ❌
 
-- **Security** (9/10)
-  - Google OAuth ✅
-  - Secrets Management (Config Hierarchy) ✅
-  - Rate limiting ✅
-  - Input sanitization ✅
-  - HTTPS enforcement ✅
-  - JWT Authentication & Protected Routes ✅
+- **Reliability** (6/10)
+  - No automated backup system ❌
+  - Basic data validation (needs more rigid constraints) ⚠️
 
-- **Reliability** (4/10)
-  - Comprehensive Error Handling ✅
-  - No retry logic ❌
-  - No backup system ❌
-  - No data validation (beyond Pydantic) ⚠️
+- **Testing** (8/10)
+  - Integration tests ❌
+  - Coverage needs expanding for edge case conflict chains ⚠️
 
-- **Testing** (7/10)
-  - Unit tests (Backend ✅, Frontend ⚠️)
-  - AI Prompt Logic ✅
-  - JWT Ownership Verification ✅
-  - No integration tests ❌
-  - E2E tests (Infrastructure ✅, Coverage ❌)
-
-- **Documentation** (2/10)
-  - README ✅
-  - API Documentation (Swagger/Redoc) ✅
-  - No user guide ❌
+- **Documentation** (3/10)
+  - API Documentation (Swagger) ✅
+  - Technical architecture notes ✅
+  - No end-user manual ❌
 
 #### Estimated Timeline to MVP
 - **2-3 weeks** for basic production deployment
-  - Week 1: Testing foundation, Environment config
-  - Week 2: Security hardening, deployment setup, monitoring
+  - Week 1: Infrastructure as Code, CI/CD setup
+  - Week 2: Reliability hardening & monitoring
   - Week 3: Bug fixes, polish, documentation
 
 - **4-6 weeks** for feature-complete MVP
   - Includes recurrence, notifications, calendar sync
 
-- **8-12 weeks** for market-ready product
-  - Includes mobile apps, team features, analytics
-
 ---
 
 ## 💡 Unique Selling Points
 
-1. **Zero Learning Curve**: No buttons to learn, just type or speak naturally
-2. **Intelligent Ambiguity Handling**: Doesn't just fail—asks smart clarifying questions
-3. **Timezone-Native**: Built for global users from day one
-4. **Conflict Prevention, Not Just Detection**: Warns you before you make scheduling mistakes
-5. **Voice-First Design**: Transcription isn't an afterthought—it's core to the UX
-6. **Premium Aesthetics**: Glassmorphism design that feels like a professional tool
+1. **Zero Learning Curve**: No buttons to learn, just type or speak naturally.
+2. **Context-Aware Scheduling**: The AI knows your habits, work hours, and preferred buffers.
+3. **Smart Fixes, Not Just Warnings**: One-tap resolution for scheduling conflicts.
+4. **Timezone-Native**: Built for global users from day one.
+5. **Premium Aesthetics**: Glassmorphism design that feels high-end and professional.
 
 ---
 
@@ -294,11 +219,6 @@ To set up your environment:
 3. Add your sensitive keys (`OPENAI_API_KEY`, etc.) to the `.env` files.
 4. **DO NOT commit `.env` files.** The root `.gitignore` is configured to protect them.
 
-### 3. Production Hardening
-- **Secrets Manager**: In production, we recommend using a dedicated manager to inject variables.
-- **Redaction**: Sensitive logs automatically redact secret prefixes/suffixes via `settings.get_safe_settings()`.
-- **Enforcement**: Setting `ENVIRONMENT=production` disables `.env` file loading.
-
 ### 🔑 Required API Keys
 ```bash
 # Backend
@@ -312,34 +232,21 @@ VITE_API_BASE_URL=https://api.yourdomain.com/v1
 VITE_GOOGLE_CLIENT_ID=...
 ```
 
-### Google OAuth Setup
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create OAuth 2.0 credentials (Web application)
-3. Add authorized origins:
-   - `http://localhost:5173`
-   - `http://127.0.0.1:5173`
-
 ---
 
 ## 📊 Current Metrics
 
-- **Lines of Code**: ~11,100
-- **API Endpoints**: 17
-- **AI Token Usage**: ~200-500 tokens per task creation
-- **Supported Features**: 25+ core features
-- **Database Tables**: 4 (Users, Jobs, JobCandidates, Tasks)
+- **Lines of Code**: ~13,500
+- **API Endpoints**: 19
+- **AI Token Usage**: ~300-600 tokens per task creation (context-enriched)
+- **Supported Features**: 30+ core features
+- **Database Tables**: 5 (Users, Jobs, JobCandidates, Tasks, UserPreferences)
 
 ---
 
 ## 🎯 Vision
 
-Momentra aims to be the **Siri of calendars**—an AI assistant that understands the nuances of time, respects your preferences, and handles scheduling complexity so you can focus on what matters.
-
----
-
-## 🤝 Contributing
-
-This is currently a private project. For questions or collaboration inquiries, contact the project owner.
+Momentra aims to be the **Siri of calendars**—an AI assistant that understands the nuances of time, respects your personal lifestyle, and handles scheduling complexity so you can focus on what matters.
 
 ---
 
@@ -349,5 +256,5 @@ Private - All Rights Reserved
 
 ---
 
-**Last Updated**: January 19, 2026 (19:20)  
-**Version**: 0.8.0-alpha
+**Last Updated**: January 21, 2026  
+**Version**: 0.9.0-alpha

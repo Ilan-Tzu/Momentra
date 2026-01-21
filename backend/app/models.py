@@ -19,6 +19,7 @@ class User(Base):
     
     jobs = relationship("Job", back_populates="user")
     tasks = relationship("Task", back_populates="user")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False)
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -64,3 +65,27 @@ class Task(Base):
     
     user = relationship("User", back_populates="tasks")
     source_job = relationship("Job", back_populates="tasks")
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    
+    # Scheduling preferences
+    buffer_minutes = Column(Integer, default=15)
+    work_start_hour = Column(Integer, default=8)
+    work_end_hour = Column(Integer, default=22)
+    default_duration_minutes = Column(Integer, default=60)
+    
+    # AI preferences
+    ai_temperature = Column(Float, default=0.0)
+    personal_context = Column(Text, nullable=True)
+    
+    # UI preferences
+    first_day_of_week = Column(Integer, default=1)  # 0=Sunday, 1=Monday
+    time_format_24h = Column(Boolean, default=False)
+    
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("User", back_populates="preferences")

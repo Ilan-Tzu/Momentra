@@ -20,7 +20,14 @@ database.init_db()
 
 app = FastAPI(title="AI Calendar Backend")
 
-# CORS Middleware should be early
+# Add middlewares in order (Last added is outermost for requests)
+if settings.ENFORCE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+app.add_middleware(
+    TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -46,13 +53,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal Server Error", "error": str(exc)},
     )
-
-app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS
-)
-
-if settings.ENFORCE_HTTPS:
-    app.add_middleware(HTTPSRedirectMiddleware)
 
 app.include_router(routes.router, prefix="/api/v1")
 

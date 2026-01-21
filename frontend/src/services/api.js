@@ -228,6 +228,16 @@ export const jobService = {
 
     deleteTask: async (id) => {
         await api.delete(`/tasks/${id}`);
+    },
+
+    getPreferences: async () => {
+        const response = await api.get('/preferences');
+        return response.data;
+    },
+
+    updatePreferences: async (data) => {
+        const response = await api.patch('/preferences', data);
+        return response.data;
     }
 };
 

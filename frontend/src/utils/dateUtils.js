@@ -16,12 +16,16 @@
  * - toLocalISOString(date): Formats Date object as local YYYY-MM-DDTHH:MM:SS
  */
 
-export const formatToLocalTime = (isoString) => {
+export const formatToLocalTime = (isoString, use24HourFormat = false) => {
     if (!isoString) return '00:00';
     try {
         const d = new Date(isoString);
         if (isNaN(d.getTime())) return '00:00';
-        return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: !use24HourFormat
+        });
     } catch (e) {
         return '00:00';
     }

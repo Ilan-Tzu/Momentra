@@ -141,3 +141,28 @@ class TokenRefresh(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class UserPreferencesRead(BaseModel):
+    id: int
+    user_id: int
+    buffer_minutes: int = 15
+    work_start_hour: int = 8
+    work_end_hour: int = 22
+    default_duration_minutes: int = 60
+    ai_temperature: float = 0.0
+    personal_context: Optional[str] = None
+    first_day_of_week: int = 1
+    time_format_24h: bool = False
+    
+    class Config:
+        from_attributes = True
+
+class UserPreferencesUpdate(BaseModel):
+    buffer_minutes: Optional[int] = None
+    work_start_hour: Optional[int] = None
+    work_end_hour: Optional[int] = None
+    default_duration_minutes: Optional[int] = None
+    ai_temperature: Optional[float] = None
+    personal_context: Optional[str] = None
+    first_day_of_week: Optional[int] = None
+    time_format_24h: Optional[bool] = None

@@ -244,3 +244,51 @@ def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User 
         return
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/preferences", response_model=schemas.UserPreferencesRead)
+def get_preferences(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from .models import UserPreferences
+    
+    # Get or create preferences
+    prefs = db.query(UserPreferences).filter(UserPreferences.user_id == current_user.id).first()
+    if not prefs:
+        prefs = UserPreferences(user_id=current_user.id)
+        db.add(prefs)
+        db.commit()
+        db.refresh(prefs)
+    return prefs
+
+@router.patch("/preferences", response_model=schemas.UserPreferencesRead)
+def update_preferences(
+    prefs_update: schemas.UserPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from .models import UserPreferences
+    
+    prefs = db.query(UserPreferences).filter(UserPreferences.user_id == current_user.id).first()
+    if not prefs:
+        prefs = UserPreferences(user_id=current_user.id)
+        db.add(prefs)
+    
+    #Update fields if provided
+    if prefs_update.buffer_minutes is not None:
+        prefs.buffer_minutes = prefs_update.buffer_minutes
+    if prefs_update.work_start_hour is not None:
+        prefs.work_start_hour = prefs_update.work_start_hour
+    if prefs_update.work_end_hour is not None:
+        prefs.work_end_hour = prefs_update.work_end_hour
+    if prefs_update.default_duration_minutes is not None:
+        prefs.default_duration_minutes = prefs_update.default_duration_minutes
+    if prefs_update.ai_temperature is not None:
+        prefs.ai_temperature = prefs_update.ai_temperature
+    if prefs_update.personal_context is not None:
+        prefs.personal_context = prefs_update.personal_context
+    if prefs_update.first_day_of_week is not None:
+        prefs.first_day_of_week = prefs_update.first_day_of_week
+    if prefs_update.time_format_24h is not None:
+        prefs.time_format_24h = prefs_update.time_format_24h
+    
+    db.commit()
+    db.refresh(prefs)
+    return prefs
