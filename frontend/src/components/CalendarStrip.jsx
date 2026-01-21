@@ -121,14 +121,18 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
 
         let maxLane = 0;
         scrollableDates.forEach(date => {
-            const targetDateStr = toLocalISOString(date).split('T')[0];
+            const dayStart = new Date(date);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setDate(dayEnd.getDate() + 1);
+
             tasks.forEach(task => {
                 if (!task.start_time || !task.end_time) return;
                 try {
-                    const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
-                    const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+                    const taskStart = new Date(normalizeToUTC(task.start_time));
+                    const taskEnd = new Date(normalizeToUTC(task.end_time));
 
-                    if (targetDateStr >= startLocal && targetDateStr <= endLocal) {
+                    if (taskStart < dayEnd && taskEnd > dayStart) {
                         const lane = taskLanes.get(task.id) ?? 0;
                         maxLane = Math.max(maxLane, lane);
                     }
@@ -142,36 +146,41 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
     const getTasksForDate = (date) => {
         if (!tasks || !Array.isArray(tasks)) return { strips: [] };
 
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
         const targetDateStr = toLocalISOString(date).split('T')[0];
         const dayTasks = [];
 
         tasks.forEach(task => {
             if (!task.start_time || !task.end_time) return;
             try {
-                const startDt = new Date(normalizeToUTC(task.start_time));
-                const endDt = new Date(normalizeToUTC(task.end_time));
-                const startLocalStr = toLocalISOString(startDt).split('T')[0];
-                const endLocalStr = toLocalISOString(endDt).split('T')[0];
+                const taskStart = new Date(normalizeToUTC(task.start_time));
+                const taskEnd = new Date(normalizeToUTC(task.end_time));
 
-                // Check overlap with target day
-                if (targetDateStr >= startLocalStr && targetDateStr <= endLocalStr) {
+                if (taskStart < dayEnd && taskEnd > dayStart) {
+                    const startLocalStr = toLocalISOString(taskStart).split('T')[0];
+                    const endLocalStr = toLocalISOString(taskEnd).split('T')[0];
+
                     let width = 100;
                     let left = 0;
 
                     if (startLocalStr === targetDateStr && endLocalStr === targetDateStr) {
                         // Single day strip
-                        const startHour = startDt.getHours() + startDt.getMinutes() / 60;
-                        const endHour = endDt.getHours() + endDt.getMinutes() / 60;
+                        const startHour = taskStart.getHours() + taskStart.getMinutes() / 60;
+                        const endHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
                         left = (startHour / 24) * 100;
                         width = ((endHour - startHour) / 24) * 100;
                     } else if (startLocalStr === targetDateStr) {
                         // Multi-day start
-                        const startHour = startDt.getHours() + startDt.getMinutes() / 60;
+                        const startHour = taskStart.getHours() + taskStart.getMinutes() / 60;
                         left = (startHour / 24) * 100;
                         width = 100 - left;
                     } else if (endLocalStr === targetDateStr) {
                         // Multi-day end
-                        const endHour = endDt.getHours() + endDt.getMinutes() / 60;
+                        const endHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
                         width = (endHour / 24) * 100;
                         left = 0;
                     }

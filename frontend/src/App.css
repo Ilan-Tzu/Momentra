@@ -478,16 +478,24 @@ header p {
   margin-top: 24px;
 }
 
-.day-tasks-header h3 {
-  font-size: 22px;
-  margin: 0;
-  font-weight: 600;
+/* Day Title Styling */
+.schedule-day-name {
+  font-size: 24px;
+  font-weight: 700;
   background: linear-gradient(135deg, #FFFFFF 0%, #E9D5FF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.3));
   letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.schedule-date-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .section-header {
@@ -502,26 +510,55 @@ header p {
   letter-spacing: -0.02em;
 }
 
-.event-badge {
-  background: rgba(139, 92, 246, 0.2);
-  color: #DDD6FE;
-  padding: 6px 12px;
+.event-badge-premium {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 20px;
-  font-size: 13px;
+  height: 52px;
+  padding: 0 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.event-badge-premium:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(168, 85, 247, 0.6);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
+}
+
+.event-count {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.event-label {
+  font-size: 11px;
   font-weight: 600;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--text-secondary);
+  text-transform: lowercase;
+  margin-top: 0;
+  opacity: 0.9;
 }
 
 /* Search Button */
 .search-btn {
-  background: rgba(168, 85, 247, 0.3);
-  /* Slightly more opaque purple */
+  background: rgba(139, 92, 246, 0.2);
   color: #FFFFFF;
-  /* High contrast white */
-  border: 1px solid rgba(168, 85, 247, 0.4);
+  border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -529,8 +566,7 @@ header p {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
-  /* Soft initial glow */
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
 }
 
 .search-btn::after {
@@ -1488,7 +1524,8 @@ header p {
 }
 
 .ambiguity-opts>button::before {
-  content: "→";
+  content: "";
+  /* Set by specific class */
   font-size: 16px;
   color: #8B5CF6;
   background: rgba(139, 92, 246, 0.15);
@@ -1501,29 +1538,34 @@ header p {
   flex-shrink: 0;
 }
 
-/* Color coding for different option types */
-/* First option = Smart Suggestion (⭐ Move to...) */
-.ambiguity-opts>button:first-child {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.15) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.4);
+/* Icon Classes */
+.btn-icon-suggested {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.15) 100%) !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
 }
 
-.ambiguity-opts>button:first-child::before {
-  content: "⭐";
-  color: #10B981;
-  background: rgba(16, 185, 129, 0.2);
+.btn-icon-suggested::before {
+  content: "⭐" !important;
+  color: #10B981 !important;
+  background: rgba(16, 185, 129, 0.2) !important;
 }
 
-.ambiguity-opts>button:nth-child(2)::before {
-  content: "✕";
-  color: #EF4444;
-  background: rgba(239, 68, 68, 0.15);
+.btn-icon-discard::before {
+  content: "✕" !important;
+  color: #EF4444 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
 }
 
-.ambiguity-opts>button:nth-child(3)::before {
-  content: "⇄";
-  color: #8B5CF6;
-  background: rgba(139, 92, 246, 0.15);
+.btn-icon-replace::before {
+  content: "⇄" !important;
+  color: #8B5CF6 !important;
+  background: rgba(139, 92, 246, 0.15) !important;
+}
+
+.btn-icon-manual::before {
+  content: "🕒" !important;
+  color: #F59E0B !important;
+  background: rgba(245, 158, 11, 0.15) !important;
 }
 
 .ambiguity-opts>button:hover {
@@ -1871,16 +1913,17 @@ header {
 
 /* Hero Section inspired by snippet */
 .hero-section {
-  margin-top: 24px;
+  margin-top: -8px;
+  /* Tighter to navbar */
 }
 
 .hero-section h1 {
-  margin: 0 0 36px 0;
-  white-space: nowrap;
-  font-size: 48px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  margin: 0 0 24px 0;
+  /* More space to tagline */
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
   background: linear-gradient(135deg, #FFFFFF 0%, #E9D5FF 50%, #C084FC 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

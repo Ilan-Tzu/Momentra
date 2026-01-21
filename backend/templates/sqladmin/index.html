@@ -3,63 +3,105 @@
 {% block content %}
 <div class="container-fluid p-4">
     <div class="row mb-4">
-        <div class="col-12">
-            <h2 class="mb-3">Overview</h2>
-        </div>
-
-        <!-- Summary Cards -->
-        <div class="col-md-4">
-            <div class="card p-3 shadow-sm border-0"
-                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <!-- Row 1: Key Metrics -->
+        <div class="col-md-3">
+            <div class="card p-3 shadow-sm border-0 bg-primary text-white">
                 <div class="card-body">
-                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Total
-                        Spend (All Time)</h5>
-                    <div class="d-flex align-items-center">
-                        <i class="fa-solid fa-dollar-sign fa-2x mr-3 opacity-50"></i>
+                    <h6 class="text-uppercase opacity-75 small">Total Revenue/Cost</h6>
+                    <div class="d-flex align-items-center justify-content-between">
                         <h2 class="mb-0" id="total-cost">$0.00</h2>
+                        <i class="fa-solid fa-sack-dollar fa-2x opacity-50"></i>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-md-4">
-            <div class="card p-3 shadow-sm border-0"
-                style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+        <div class="col-md-3">
+            <div class="card p-3 shadow-sm border-0 bg-success text-white">
                 <div class="card-body">
-                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Total
-                        Requests</h5>
-                    <div class="d-flex align-items-center">
-                        <i class="fa-solid fa-server fa-2x mr-3 opacity-50"></i>
-                        <h2 class="mb-0" id="total-requests">0</h2>
+                    <h6 class="text-uppercase opacity-75 small">Active Users (30d)</h6>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h2 class="mb-0" id="active-users">0</h2>
+                        <i class="fa-solid fa-users fa-2x opacity-50"></i>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-md-4">
-            <div class="card p-3 shadow-sm border-0"
-                style="background: linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%); color: white;">
+        <div class="col-md-3">
+            <div class="card p-3 shadow-sm border-0 bg-info text-white">
                 <div class="card-body">
-                    <h5 class="card-title text-uppercase font-weight-bold opacity-75" style="font-size: 0.8rem;">Project
-                        Status</h5>
-                    <div class="d-flex align-items-center">
-                        <i class="fa-solid fa-rocket fa-2x mr-3 opacity-50"></i>
-                        <h2 class="mb-0">Active</h2>
+                    <h6 class="text-uppercase opacity-75 small">Avg Latency</h6>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h2 class="mb-0" id="avg-latency">0ms</h2>
+                        <i class="fa-solid fa-bolt fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 shadow-sm border-0 bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="text-uppercase opacity-75 small">Job Conversion</h6>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h2 class="mb-0" id="conversion-rate">0%</h2>
+                        <i class="fa-solid fa-filter fa-2x opacity-50"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Chart Section -->
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Main Line Chart -->
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Traffic & Cost (Last 14 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="usageChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Doughnut Chart: Job Status -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Job Status Funnel</h5>
+                </div>
+                <div class="card-body d-flex justify-content-center">
+                    <canvas id="statusChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Model Usage -->
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white border-0 pt-4 px-4">
-                    <h5 class="card-title mb-0">Daily Token Usage & Cost (Last 7 Days)</h5>
+                    <h5 class="card-title mb-0">AI Model Usage Breakdown</h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="usageChart" height="100"></canvas>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Model Name</th>
+                                    <th>Total Calls</th>
+                                    <th>Total Cost (USD)</th>
+                                    <th>Avg Cost per Call</th>
+                                </tr>
+                            </thead>
+                            <tbody id="model-table-body">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -75,38 +117,33 @@
             const response = await fetch('/api/v1/admin/stats');
             const data = await response.json();
 
-            // Update Cards
-            document.getElementById('total-cost').textContent = '$' + data.total_cost_usd.toFixed(4);
-            document.getElementById('total-requests').textContent = data.total_requests;
+            // 1. Update KPI Cards
+            document.getElementById('total-cost').textContent = '$' + data.overview.total_cost_usd.toFixed(2);
+            document.getElementById('active-users').textContent = data.overview.active_users_30d;
+            document.getElementById('avg-latency').textContent = data.overview.avg_latency_ms + 'ms';
+            document.getElementById('conversion-rate').textContent = data.overview.conversion_rate + '%';
 
-            // Prepare Chart Data
-            // API returns descending (newest first), let's reverse for chart (oldest left)
+            // 2. Line Chart: Usage History
             const daily = data.daily_stats.reverse();
-
-            const labels = daily.map(d => d.date);
-            const costs = daily.map(d => d.total_cost);
-            const requests = daily.map(d => d.total_requests);
-
-            const ctx = document.getElementById('usageChart').getContext('2d');
-            new Chart(ctx, {
+            new Chart(document.getElementById('usageChart').getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: labels,
+                    labels: daily.map(d => d.date),
                     datasets: [
                         {
                             label: 'Cost (USD)',
-                            data: costs,
-                            borderColor: '#764ba2',
-                            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                            data: daily.map(d => d.total_cost),
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
                             yAxisID: 'y',
                             fill: true,
                             tension: 0.4
                         },
                         {
                             label: 'Requests',
-                            data: requests,
-                            borderColor: '#38ef7d',
-                            backgroundColor: 'rgba(56, 239, 125, 0.1)',
+                            data: daily.map(d => d.total_requests),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
                             yAxisID: 'y1',
                             fill: true,
                             tension: 0.4
@@ -115,38 +152,53 @@
                 },
                 options: {
                     responsive: true,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
+                    maintainAspectRatio: false,
                     scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'Cost ($)' },
-                            beginAtZero: true
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Requests' },
-                            grid: {
-                                drawOnChartArea: false, // only want the grid lines for one axis to show up
-                            },
-                            beginAtZero: true
-                        },
+                        y: { position: 'left', title: { display: true, text: 'Cost' }, beginAtZero: true },
+                        y1: { position: 'right', title: { display: true, text: 'Reqs' }, grid: { drawOnChartArea: false }, beginAtZero: true }
                     }
                 }
             });
+
+            // 3. Doughnut Chart: Job Status
+            const statuses = Object.keys(data.job_status_distribution);
+            new Chart(document.getElementById('statusChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: statuses,
+                    datasets: [{
+                        data: Object.values(data.job_status_distribution),
+                        backgroundColor: ['#e2e8f0', '#fbbf24', '#10b981', '#ef4444'], // Created, Parsed, Accepted, Failed/Etc
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // 4. Fill Model Table
+            const setupTable = (models) => {
+                const tbody = document.getElementById('model-table-body');
+                tbody.innerHTML = '';
+                models.forEach(m => {
+                    const avg = m.calls > 0 ? (m.cost / m.calls).toFixed(5) : '0.00000';
+                    const tr = `<tr>
+                        <td class="fw-bold text-primary">${m.model}</td>
+                        <td>${m.calls}</td>
+                        <td>$${m.cost.toFixed(4)}</td>
+                        <td class="text-muted">$${avg}</td>
+                    </tr>`;
+                    tbody.innerHTML += tr;
+                });
+            }
+            setupTable(data.model_usage);
 
         } catch (e) {
             console.error("Failed to load admin stats", e);
         }
     }
-
-    // Initial Load
     loadStats();
 </script>
 {% endblock %}

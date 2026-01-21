@@ -193,7 +193,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                             <p className="setting-hint">Higher values make the AI more creative and unpredictable</p>
                         </div>
 
-                        <div className="setting-item">
+                        <div className="setting-item full-width">
                             <label>
                                 <span className="label-text">Personal Context</span>
                             </label>

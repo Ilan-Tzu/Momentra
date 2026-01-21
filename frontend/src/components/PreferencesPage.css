@@ -107,25 +107,42 @@
 }
 
 .settings-section {
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-    max-width: 600px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
 }
 
 .setting-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    transition: all 0.2s ease;
+    min-height: 160px;
+}
+
+.setting-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.setting-item.full-width {
+    grid-column: 1 / -1;
 }
 
 .setting-item label {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     color: #fff;
     font-weight: 500;
-    font-size: 16px;
+    font-size: 15px;
+    margin-bottom: 4px;
 }
 
 .setting-item .label-text {

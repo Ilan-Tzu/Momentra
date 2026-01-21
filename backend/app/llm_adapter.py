@@ -40,7 +40,7 @@ class AmbiguityOption(BaseModel):
 
 class AIAmbiguity(BaseModel):
     title: str = Field(..., description="A short tentative title for the ambiguous task, e.g. 'Dinner' or 'Meeting'")
-    type: str = Field(..., description="Category: 'missing_time', 'conflict', 'unclear_intent'")
+    type: str = Field(..., description="Category: 'missing_time', 'unclear_intent'")
     message: str = Field(..., description="Question to ask the user to resolve this")
     options: List[AmbiguityOption] = Field(default_factory=list, description="Suggested resolution options")
 
@@ -141,7 +141,9 @@ class LLMAdapter:
         """
              
         system_prompt = f"""
-        You are an AI Calendar Assistant. 
+        SYSTEM ROLE:
+        You are "System A" in a two-stage pipeline. Your SOLE responsibility is SEMANTIC CLARITY.
+        System B (the backend database) handles LOGISTICAL CONFLICTS.
         
         CURRENT USER CONTEXT:
         - User's Local Date: {current_date_str}
@@ -155,23 +157,28 @@ class LLMAdapter:
         Upcoming Days Reference:
 {upcoming_days_context}
         
-        STEPS:
-        1. Analyze input in 'reasoning'. Focus on temporal clues and semantic context.
-        2. Identify tasks, commands, or ambiguities.
-        3. Infer AM/PM from semantic clues (e.g. meals, social habits, personal context) before flagging ambiguity. 
-           Inferred times are considered UNAMBIGUOUS; create tasks for them immediately.
-        4. Transpose all dates/times into UTC.
+        YOUR JOB:
+        1. Extract user intent into structural JSON.
+        2. Identify "Semantic Ambiguities" (vagueness in language).
+        3. IGNORE "Logistical Ambiguities" (schedule overlaps).
         
-        LOGIC RULES:
-        - 24-hour format: Extract directly (13-23 are always PM).
-        - Ambiguity: Flag ONLY if time is exactly 1-12 and NO semantic clues exist (e.g. "Call Bob at 4").
-        - Stay Events: For "Airbnb", "Hotel", or "Stay", if times are missing, ALWAYS flag ambiguity to confirm check-in/out. Suggest standard times (e.g. 3 PM in / 11 AM out) as options.
-        - Relative Dates: "Tomorrow", "Next Friday", etc., must be calculated from {current_date_str}.
+        RULES:
+        - [YES] DO extract intent: "Meeting at 8" -> Ambiguous (AM or PM?).
+        - [YES] DO extract intent: "Lunch for 2 hours" -> Valid Task.
+        - [NO] DO NOT check if "8 AM" is free. That is System B's job.
+        - [NO] DO NOT flag overlaps as ambiguity. If user says "Task A at 9am" and "Task B at 9am", create valid tasks for BOTH.
+        - [NO] DO NOT use the word 'conflict' in any input/output.
         
-        AMBIGUITY REQUIREMENTS:
-        - 'title' must be the specific task name (e.g. "Meeting with Bob").
-        - Provide helpful options with UTC values.
-        - The 'value' field of an option must be a JSON string containing the full task parameters.
+        CRITCAL DATE/TIME LOGIC:
+        - "Overnight" events: If start is PM and end is "next morning" or a small AM hour (e.g. 9pm to 5am), valid end_time is the NEXT DAY.
+        - "Multi-day" events: If user says "Conference from Mon to Wed", end_time must be on Wednesday.
+        - ALWAYS respect the specific date if mentioned.
+        
+        AMBIGUITY GUIDELINES (System A):
+        - Flag ONLY if the *language* is unclear (e.g. missing time units, vague terms like "sometime").
+        - If time is mentioned (e.g. "at 5"), infer AM/PM if possible from context (5pm dinner), else flag as Semantic Ambiguity.
+        - 'title' must be the specific task name.
+        - Provide options with 'value' as a JSON string of parameters.
         """
 
         try:

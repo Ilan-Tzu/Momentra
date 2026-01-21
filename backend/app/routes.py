@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Request, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from . import schemas, services
@@ -164,7 +164,8 @@ def accept_job(job_id: int, accept_req: schemas.JobAccept, db: Session = Depends
         return {
             "job_id": job.id,
             "status": job.status,
-            "tasks_created": tasks
+            "tasks_created": tasks,
+            "remaining_candidates": job.candidates
         }
     except ValueError as e:
         if "CONFLICT:" in str(e):
@@ -203,9 +204,9 @@ def delete_candidate(candidate_id: int, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/tasks", response_model=List[schemas.TaskRead])
-def get_tasks(start_date: datetime, end_date: datetime, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_tasks(start: Optional[datetime] = None, end: Optional[datetime] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = services.JobService(db)
-    return service.get_tasks(start_date, end_date, current_user.id)
+    return service.get_tasks(start, end, current_user.id)
 
 @router.patch("/tasks/{task_id}", response_model=schemas.TaskRead)
 def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -301,31 +302,59 @@ def get_admin_stats(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Returns aggregated token usage statistics.
-    TODO: Add admin role check for production.
+    Returns aggregated analytics for the admin dashboard.
     """
-    from sqlalchemy import func
+    from sqlalchemy import func, distinct
     from datetime import timedelta
-    from .models import TokenLog
+    from .models import TokenLog, Job, User, Task
     
-    # Total cost and requests (all time)
+    # 1. Total Cost & Requests
     total_stats = db.query(
         func.sum(TokenLog.cost_usd).label("total_cost"),
-        func.count(TokenLog.id).label("total_requests")
+        func.count(TokenLog.id).label("total_requests"),
+        func.avg(TokenLog.latency_ms).label("avg_latency")
     ).first()
     
     total_cost = total_stats.total_cost or 0.0
     total_requests = total_stats.total_requests or 0
+    avg_latency = total_stats.avg_latency or 0.0
     
-    # Daily stats for last 7 days
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    # 2. Active Users (Users who created a job in last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    active_users = db.query(func.count(distinct(Job.user_id))).filter(
+        Job.created_at >= thirty_days_ago
+    ).scalar() or 0
     
-    daily_stats = db.query(
+    # 3. Job Conversion Funnel
+    # Count jobs by status
+    job_counts = db.query(
+        Job.status, func.count(Job.id)
+    ).group_by(Job.status).all()
+    
+    job_stats = {status.name: count for status, count in job_counts}
+    total_jobs = sum(job_stats.values())
+    accepted_jobs = job_stats.get("ACCEPTED", 0)
+    conversion_rate = (accepted_jobs / total_jobs * 100) if total_jobs > 0 else 0.0
+    
+    # 4. Model Usage (Cost by Model)
+    model_stats = db.query(
+        TokenLog.model,
+        func.sum(TokenLog.cost_usd).label("cost"),
+        func.count(TokenLog.id).label("calls")
+    ).group_by(TokenLog.model).all()
+    
+    model_usage = [
+        {"model": m[0], "cost": round(m[1] or 0, 4), "calls": m[2]} 
+        for m in model_stats
+    ]
+    
+    # 5. Daily Stats (Last 14 days)
+    daily_stats_query = db.query(
         func.date(TokenLog.timestamp).label("date"),
         func.sum(TokenLog.cost_usd).label("total_cost"),
         func.count(TokenLog.id).label("total_requests")
     ).filter(
-        TokenLog.timestamp >= seven_days_ago
+        TokenLog.timestamp >= datetime.utcnow() - timedelta(days=14)
     ).group_by(
         func.date(TokenLog.timestamp)
     ).order_by(
@@ -333,14 +362,22 @@ def get_admin_stats(
     ).all()
     
     return {
-        "total_cost_usd": round(total_cost, 6),
-        "total_requests": total_requests,
+        "overview": {
+            "total_cost_usd": round(total_cost, 4),
+            "total_requests": total_requests,
+            "avg_latency_ms": round(avg_latency, 0),
+            "active_users_30d": active_users,
+            "conversion_rate": round(conversion_rate, 1),
+            "total_jobs": total_jobs
+        },
+        "job_status_distribution": job_stats,
+        "model_usage": model_usage,
         "daily_stats": [
             {
                 "date": str(stat.date),
-                "total_cost": round(stat.total_cost or 0, 6),
+                "total_cost": round(stat.total_cost or 0, 4),
                 "total_requests": stat.total_requests or 0
             }
-            for stat in daily_stats
+            for stat in daily_stats_query
         ]
     }

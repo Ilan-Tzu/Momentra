@@ -128,6 +128,7 @@ class JobExecuteResponse(BaseModel):
     job_id: int
     status: JobStatus
     tasks_created: List[TaskRead]
+    remaining_candidates: List[JobCandidateRead] = []
 
 class Token(BaseModel):
     access_token: str

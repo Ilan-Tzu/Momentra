@@ -175,6 +175,14 @@ class JobService:
             user_id=job.user_id
         )
         
+        # DEBUG: Log the raw result to understand why ambiguities are persisting
+        try:
+            with open("llm_debug.log", "a") as f:
+                f.write(f"\n\n--- PARSE JOB {job_id} ---\n")
+                f.write(json.dumps(result, indent=2))
+                f.write("\n------------------------\n")
+        except: pass
+        
         # Clear existing candidates 
         self.db.query(JobCandidate).filter(JobCandidate.job_id == job_id).delete()
 
@@ -199,30 +207,25 @@ class JobService:
                 task['end_time'] = new_end.isoformat() + "Z"
             
             task_title = task.get("title", "New Task")
-            
-            # 1. Check for conflicts with existing tasks (Database)
-            conflict_found = self._find_conflict(job.user_id, new_start, new_end) if new_start else None
-            
-            # 2. Check for conflicts with candidates already processed in this job
-            if not conflict_found and new_start:
-                for prev in provisionally_accepted:
-                    if prev['is_blocking'] and self._times_overlap(new_start, new_end, prev['start'], prev['end']):
-                        conflict_found = prev['cand_obj']
-                        break
-            
             is_background_cand = self._is_background_event(task_title)
             
-            # Determine if the conflict found is "blocking"
-            is_conflict_bg = False
-            if conflict_found:
-                if hasattr(conflict_found, 'is_blocking'):
-                    is_conflict_bg = not conflict_found.is_blocking
-                else: 
-                    # It's a candidate
-                    is_conflict_bg = self._is_background_event(getattr(conflict_found, 'description', ''))
+            should_raise_conflict = False
             
-            should_raise_conflict = conflict_found and not (is_background_cand or is_conflict_bg)
+            # --- BACKEND LOGIC SYSTEM: DETECT CONFLICTS ---
+            # If AI identified it as a TASK (has start_time), check against DB
+            if new_start:
+                # 1. Check for conflicts with existing tasks (Database)
+                conflict_found = self._find_conflict(job.user_id, new_start, new_end)
+                
+                # Check exclusion criteria (background events etc)
+                is_conflict_bg = False
+                if conflict_found and hasattr(conflict_found, 'is_blocking'):
+                    is_conflict_bg = not conflict_found.is_blocking
+                
+                if conflict_found and not (is_background_cand or is_conflict_bg):
+                     should_raise_conflict = True
 
+            # If the Backend Logic System detects a conflict, override the candidate to AMBIGUITY
             if should_raise_conflict:
                 candidate = JobCandidate(
                     job_id=job.id,
@@ -231,7 +234,7 @@ class JobService:
                     parameters=self._format_conflict_parameters(
                         task_title,
                         task.get("start_time"),
-                        new_end.isoformat() + "Z" if new_end else None, # Use the calculated end time
+                        new_end.isoformat() + "Z" if new_end else None,
                         conflict_found,
                         user_id=job.user_id,
                         provisionally_accepted=provisionally_accepted
@@ -298,23 +301,62 @@ class JobService:
             candidates.append(candidate)
             
         # Process Ambiguities (from LLM)
+        # Process Ambiguities (from LLM)
         for amb in result.get("ambiguities", []):
-            candidate = JobCandidate(
-                job_id=job.id,
-                description=amb.get("title") or f"Ambiguity: {amb.get('message')}",
-                command_type="AMBIGUITY",
-                parameters={
-                    "type": amb.get("type"), 
-                    "message": amb.get("message"),
-                    "options": [
-                        {"label": opt.get("label"), "value": opt.get("value")} 
-                        for opt in amb.get("options", [])
-                    ]
-                },
-                confidence=0.0
-            )
-            self.db.add(candidate)
-            candidates.append(candidate)
+            # NEW: Check if this "ambiguity" is actually a valid task that LLM flagged as conflict
+            # If it has options with valid JSON values containing start_time, pick the first option as the default task
+            converted_to_task = False
+            
+            # Check if this "ambiguity" (regardless of type) has a recoverable option with time
+            if amb.get("options"):
+                 for opt in amb.get("options", []):
+                     # Trust any option that has a JSON value with a start_time
+                     try:
+                         val = json.loads(opt["value"])
+                         if "start_time" in val and val.get("title"):
+                             # It has a time! Create as task instead.
+                             new_start = self._parse_datetime(val.get("start_time"))
+                             new_end = self._parse_datetime(val.get("end_time"))
+                             # Double check conflicts against DB ONLY (not batch)
+                             conflict = self._find_conflict(job.user_id, new_start, new_end)
+                             
+                             if not conflict:
+                                 # No DB conflict? Then it's a valid task.
+                                 candidate = JobCandidate(
+                                     job_id=job.id,
+                                     description=val.get("title", "Recovered Task"),
+                                     command_type="CREATE_TASK",
+                                     parameters={
+                                         "title": val.get("title"),
+                                         "start_time": val.get("start_time"),
+                                         "end_time": val.get("end_time"),
+                                         "description": amb.get("message")
+                                     },
+                                     confidence=0.8
+                                 )
+                                 self.db.add(candidate)
+                                 candidates.append(candidate)
+                                 converted_to_task = True
+                                 break 
+                     except: pass
+            
+            if not converted_to_task:
+                candidate = JobCandidate(
+                    job_id=job.id,
+                    description=amb.get("title") or f"Ambiguity: {amb.get('message')}",
+                    command_type="AMBIGUITY",
+                    parameters={
+                        "type": amb.get("type"), 
+                        "message": amb.get("message"),
+                        "options": [
+                            {"label": opt.get("label"), "value": opt.get("value")} 
+                            for opt in amb.get("options", [])
+                        ]
+                    },
+                    confidence=0.0
+                )
+                self.db.add(candidate)
+                candidates.append(candidate)
         
         job.status = JobStatus.PARSED
         self.db.commit()
@@ -587,14 +629,18 @@ class JobService:
             })}
         ])
 
+        # Format readable time for the conflict
+        existing_end_iso = existing_end.isoformat() + "Z" if existing_end else None
+
         return {
             "type": "conflict",
             "title": title,
             "existing_title": existing_title,
             "existing_start_time": existing_start_iso,
+            "existing_end_time": existing_end_iso, # PASS END TIME
             "start_time": start_time,
             "end_time": end_time,
-            "message": f"'{title}' conflicts with '{existing_title}'. What would you like to do?",
+            "message": f"'{title}' conflicts with '{existing_title}' ({existing_start_iso} - {existing_end_iso or '?'}). What would you like to do?",
             "options": options
         }
 
@@ -613,9 +659,13 @@ class JobService:
         ).all()
 
         created_tasks = []
+        issues_encountered = False
+
+        # Maintain a list of tasks created in THIS batch to check against
+        batch_tasks = []
+
         for cand in candidates:
             if cand.command_type != "CREATE_TASK":
-                print(f"DEBUG: Skipping candidate {cand.id} as it is not CREATE_TASK (type={cand.command_type})")
                 continue
                 
             params = cand.parameters
@@ -627,26 +677,131 @@ class JobService:
             
             start_time = self._parse_datetime(params.get("start_time"))
             if not start_time:
-                print(f"DEBUG: Skipping candidate {cand.id} due to missing start_time")
                 continue
                 
+            end_time = self._parse_datetime(params.get("end_time"))
+            task_title = params.get("title", cand.description)
+
+            # --- CONFLICT CHECK ---
+            conflict_found = None
+            if not ignore_conflicts:
+                # 1. Check DB
+                conflict_found = self._find_conflict(user_id, start_time, end_time)
+                
+                # 2. Check previously created tasks in this batch
+                if not conflict_found:
+                    for batch_task in batch_tasks:
+                         if batch_task['is_blocking'] and self._times_overlap(start_time, end_time, batch_task['start'], batch_task['end']):
+                            conflict_found = batch_task['obj'] # Just need truthy object
+                            break
+
+            if conflict_found:
+                # Update Candidate to Ambiguity
+                cand.command_type = "AMBIGUITY"
+                cand.description = f"Conflict: {task_title}"
+                cand.parameters = self._format_conflict_parameters(
+                    task_title,
+                    params.get("start_time"),
+                    params.get("end_time"),
+                    conflict_found,
+                    user_id=user_id
+                )
+                self.db.add(cand)
+                issues_encountered = True
+                continue
+            
             # Simple mapping logic
-            is_blocking = not self._is_background_event(params.get("title", cand.description))
+            is_blocking = not self._is_background_event(task_title)
             
             task = Task(
                 source_job_id=job.id,
                 user_id=job.user_id,
-                title=params.get("title", cand.description),
+                title=task_title,
                 start_time=start_time,
-                end_time=self._parse_datetime(params.get("end_time")),
+                end_time=end_time,
                 description=params.get("description", ""),
                 is_blocking=is_blocking
             )
-            print(f"DEBUG: Creating Task: title='{task.title}', is_blocking={is_blocking}, start={task.start_time}")
             self.db.add(task)
+            self.db.flush() # Get ID
             created_tasks.append(task)
+            batch_tasks.append({
+                'start': start_time,
+                'end': end_time,
+                'is_blocking': is_blocking,
+                'obj': task
+            })
+            
+            # Clean up used candidate
+            self.db.delete(cand)
+
+        # NEW: Check REMAINING candidates for conflicts with the tasks we just created
+        # Logic: If I just accepted "Lunch at 1PM", and there's a pending candidate "Meeting at 1PM"
+        # that wasn't selected yet (or user accepted one by one), that pending candidate must now become a conflict.
         
-        job.status = JobStatus.ACCEPTED
+        if created_tasks:
+            # --- SYSTEM B LOGIC: POST-ACCEPTANCE CONFLICT DETECTION ---
+            # Now that a task is firmly in the DB, check if any PENDING candidates conflict with it.
+            # If so, convert them to AMBIGUITY immediately.
+            
+            # Check REMAINING candidates for conflicts
+            self.db.flush() # Ensure deletes are processed so we don't fetch deleted candidates
+            
+            remaining_candidates = self.db.query(JobCandidate).filter(
+                JobCandidate.job_id == job_id,
+                JobCandidate.command_type == "CREATE_TASK" 
+            ).all()
+            
+            print(f"DEBUG: Checking {len(remaining_candidates)} remaining candidates for conflicts against {len(created_tasks)} new tasks")
+
+            for rem_cand in remaining_candidates:
+                # Parse params
+                rem_params = rem_cand.parameters
+                # Handle potential SQLAlchemy dict vs str
+                if isinstance(rem_params, str):
+                    try: rem_params = json.loads(rem_params)
+                    except: continue
+                elif not isinstance(rem_params, dict):
+                    continue
+
+                rem_start = self._parse_datetime(rem_params.get("start_time"))
+                rem_end = self._parse_datetime(rem_params.get("end_time"))
+
+                if not rem_start: 
+                    continue
+                
+                # Check against tasks created in this batch
+                conflict_obj = None
+                for new_task in created_tasks:
+                     # Ensure we are comparing simple dates
+                     if new_task.is_blocking and self._times_overlap(rem_start, rem_end, new_task.start_time, new_task.end_time):
+                        conflict_obj = new_task
+                        break
+                
+                if conflict_obj:
+                    print(f"DEBUG: Found conflict! Candidate {rem_cand.id} overlaps with New Task {conflict_obj.id}")
+                    # Transform to AMBIGUITY
+                    rem_cand.command_type = "AMBIGUITY"
+                    rem_cand.description = f"Conflict: {rem_params.get('title', 'Event')}"
+                    rem_cand.parameters = self._format_conflict_parameters(
+                        rem_params.get("title", "Event"),
+                        rem_params.get("start_time"),
+                        rem_params.get("end_time"),
+                        conflict_obj,
+                        user_id=user_id
+                    )
+                    self.db.add(rem_cand)
+                    issues_encountered = True
+
+        
+        # Determine Job Status
+        # If we have any remaining candidates for this job (including the ones we just turned to ambiguity), stay PARSED
+        count_remaining = self.db.query(JobCandidate).filter(JobCandidate.job_id == job_id).count()
+        if count_remaining > 0:
+            job.status = JobStatus.PARSED
+        else:
+            job.status = JobStatus.ACCEPTED
+
         self.db.commit()
         return created_tasks
 
@@ -746,12 +901,18 @@ class JobService:
         self.db.delete(candidate)
         self.db.commit()
 
-    def get_tasks(self, start_date: datetime, end_date: datetime, user_id: int) -> List[Task]:
-        # Relaxed query to just show all user tasks for now to ensure they appear
-        # We can re-add strict range filtering later if needed
-        return self.db.query(Task).filter(
-            Task.user_id == user_id
-        ).order_by(Task.start_time.asc()).all()
+    def get_tasks(self, start: Optional[datetime], end: Optional[datetime], user_id: int) -> List[Task]:
+        """Fetch tasks for a user within an optional time range."""
+        query = self.db.query(Task).filter(Task.user_id == user_id)
+        
+        if start:
+            # Task must end after the start of range
+            query = query.filter(Task.end_time >= start)
+        if end:
+            # Task must start before the end of range
+            query = query.filter(Task.start_time <= end)
+            
+        return query.order_by(Task.start_time.asc()).all()
 
     def _normalize_aware_dt(self, dt: Optional[datetime]) -> Optional[datetime]:
         """Convert aware datetime to naive UTC, or return as is if already naive."""

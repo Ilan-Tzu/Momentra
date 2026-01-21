@@ -121,9 +121,19 @@ function App() {
     handleSearchClose();
   };
 
+  const fetchPreferences = async () => {
+    try {
+      const data = await jobService.getPreferences();
+      setPreferences(data);
+    } catch (e) {
+      console.error("Failed to fetch preferences", e);
+    }
+  }
+
   useEffect(() => {
     if (user) {
       fetchCalendarTasks();
+      fetchPreferences();
     }
   }, [user])
 
@@ -264,19 +274,34 @@ function App() {
 
   const finalizeAcceptance = async (candidateId, force = false) => {
     try {
-      await jobService.acceptJob(jobId, {
+      const res = await jobService.acceptJob(jobId, {
         selected_candidate_ids: [candidateId],
         ignore_conflicts: force
       });
-      await jobService.deleteJobCandidate(candidateId);
-      const remainingCandidates = candidates.filter(c => c.id !== candidateId);
-      setCandidates(remainingCandidates);
-      await fetchCalendarTasks();
 
-      // If no more candidates, close the preview modal
-      if (remainingCandidates.length === 0) {
-        reset();
+      // Use server-provided remaining candidates (which may have been converted to conflicts)
+      // Normalize them just like in refreshPreview
+      if (res.remaining_candidates) {
+        const normalized = res.remaining_candidates.map(c => {
+          const p = { ...c.parameters };
+          if (p.start_time) p.start_time = toUTC(p.start_time);
+          if (p.end_time) p.end_time = toUTC(p.end_time);
+          if (p.existing_start_time) p.existing_start_time = toUTC(p.existing_start_time);
+          return { ...c, parameters: p };
+        });
+        setCandidates(normalized);
+
+        if (normalized.length === 0) {
+          reset();
+        }
+      } else {
+        // Fallback if field missing (shouldn't happen with updated backend)
+        const remainingCandidates = candidates.filter(c => c.id !== candidateId);
+        setCandidates(remainingCandidates);
+        if (remainingCandidates.length === 0) reset();
       }
+
+      await fetchCalendarTasks();
 
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
@@ -294,9 +319,19 @@ function App() {
       const allIds = candidates.map(c => c.id);
       await jobService.acceptJob(jobId, allIds);
       await fetchCalendarTasks();
-      reset();
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+
+      // Check if job still has remaining candidates (partial success/conflicts)
+      const updatedJob = await jobService.getJob(jobId);
+      if (updatedJob.status === 'PARSED' && updatedJob.candidates.length > 0) {
+        // Partial success - some tasks created, others became ambiguities
+        await refreshPreview(jobId);
+        setErrorMsg('Some events conflicted. Please resolve them below.');
+      } else {
+        // Complete success
+        reset();
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg('Failed to save to calendar.');
@@ -425,13 +460,17 @@ function App() {
 
   const selectedDayTasks = calendarTasks.filter(task => {
     if (!task.start_time || !task.end_time) return false;
-    // Use local time for range checking
     try {
-      const targetDateStr = toLocalISOString(selectedDate).split('T')[0];
-      const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
-      const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+      const taskStart = new Date(normalizeToUTC(task.start_time));
+      const taskEnd = new Date(normalizeToUTC(task.end_time));
 
-      return targetDateStr >= startLocal && targetDateStr <= endLocal;
+      const dayStart = new Date(selectedDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      // Standard interval overlap: (StartA < EndB) and (EndA > StartB)
+      return taskStart < dayEnd && taskEnd > dayStart;
     } catch (e) { return false; }
   }).map(task => {
     // Add visual segment info
@@ -681,9 +720,15 @@ function App() {
             </div>
 
             <div className="day-tasks-header">
-              <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule ({selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })})</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span className="schedule-day-name">{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule</span>
+                <span className="schedule-date-label">{selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <span className="event-badge">{selectedDayTasks.length} events</span>
+                <div className="event-badge-premium">
+                  <span className="event-count">{selectedDayTasks.length}</span>
+                  <span className="event-label">{selectedDayTasks.length === 1 ? 'event' : 'events'}</span>
+                </div>
                 <button
                   className="search-btn"
                   onClick={handleSearchOpen}
@@ -762,9 +807,16 @@ function App() {
                               {candidate.parameters.start_time ? (
                                 <>
                                   {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time), preferences?.time_format_24h)}
-                                  {candidate.parameters.end_time && (
-                                    <> - {formatToLocalTime(normalizeToUTC(candidate.parameters.end_time), preferences?.time_format_24h)}</>
-                                  )}
+                                  {candidate.parameters.end_time && (() => {
+                                    const startDt = new Date(normalizeToUTC(candidate.parameters.start_time));
+                                    const endDt = new Date(normalizeToUTC(candidate.parameters.end_time));
+                                    const isDiffDay = startDt.toDateString() !== endDt.toDateString();
+                                    const timeStr = formatToLocalTime(normalizeToUTC(candidate.parameters.end_time), preferences?.time_format_24h);
+
+                                    return (
+                                      <> - {timeStr} {isDiffDay && <span style={{ fontSize: '0.85em', opacity: 0.7, marginLeft: '4px' }}>(+1)</span>}</>
+                                    );
+                                  })()}
                                 </>
                               ) : 'No time'}
                             </span>
@@ -776,22 +828,37 @@ function App() {
                           <div className="ambiguity-content">
                             <h4>
                               {candidate.parameters.type === 'conflict' && candidate.parameters.existing_start_time
-                                ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time), preferences?.time_format_24h)}. What would you like to do?`
+                                ? (candidate.parameters.existing_end_time
+                                  ? `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' (${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time), preferences?.time_format_24h)} - ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_end_time), preferences?.time_format_24h)}). What would you like to do?`
+                                  : `'${candidate.parameters.title}' conflicts with '${candidate.parameters.existing_title}' at ${formatToLocalTime(normalizeToUTC(candidate.parameters.existing_start_time), preferences?.time_format_24h)}. What would you like to do?`)
                                 : candidate.parameters.message}
                             </h4>
                             <div className="ambiguity-opts">
                               {candidate.parameters.options?.map((opt, i) => {
                                 let label = opt.label;
-                                if (opt.suggested && opt.display_time) {
-                                  const startStr = formatToLocalTime(normalizeToUTC(opt.display_time), preferences?.time_format_24h);
-                                  const endStr = opt.end_time ? formatToLocalTime(normalizeToUTC(opt.end_time), preferences?.time_format_24h) : '';
-                                  label = `⭐ Suggested time: ${startStr}${endStr ? ' - ' + endStr : ''}`;
+                                let btnClass = "ambiguity-btn";
+                                let val = {};
+
+                                try { val = JSON.parse(opt.value) } catch (e) { }
+
+                                if (opt.suggested || val.suggested) {
+                                  btnClass += " btn-icon-suggested";
+                                  const startStr = formatToLocalTime(normalizeToUTC(opt.display_time || val.start_time), preferences?.time_format_24h);
+                                  const endStr = (opt.end_time || val.end_time) ? formatToLocalTime(normalizeToUTC(opt.end_time || val.end_time), preferences?.time_format_24h) : '';
+                                  label = `Suggested: ${startStr}${endStr ? ' - ' + endStr : ''}`;
+                                } else if (val.discard) {
+                                  label = "Discard New Task";
+                                  btnClass += " btn-icon-discard";
+                                } else if (val.keep_both) {
+                                  label = "Manual Adjustment";
+                                  btnClass += " btn-icon-manual";
+                                } else if (val.remove_task_id || val.remove_candidate_id) {
+                                  label = `Replace Existing`;
+                                  btnClass += " btn-icon-replace";
                                 }
 
                                 return (
-                                  <button key={i} onClick={async () => {
-                                    let val = {};
-                                    try { val = JSON.parse(opt.value) } catch (e) { }
+                                  <button key={i} className={btnClass} style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={async () => {
 
                                     if (val.discard) {
                                       await jobService.deleteJobCandidate(candidate.id);
@@ -806,14 +873,33 @@ function App() {
                                           return parsed.remove_task_id;
                                         } catch { return false; }
                                       });
-                                      let existingTaskId = null;
+
+                                      let removeId = null;
                                       if (replaceOption) {
                                         try {
-                                          existingTaskId = JSON.parse(replaceOption.value).remove_task_id;
-                                        } catch { }
+                                          removeId = JSON.parse(replaceOption.value).remove_task_id;
+                                        } catch (e) { }
                                       }
 
-                                      const existingTask = calendarTasks.find(t => t.id === existingTaskId);
+                                      // Manual Adjustment Flow
+                                      let existingTask = null;
+                                      if (removeId) {
+                                        // Try local find first
+                                        existingTask = calendarTasks.find(t => t.id === removeId);
+                                        if (!existingTask) {
+                                          try { existingTask = await jobService.getTask(removeId); } catch (e) { }
+                                        }
+                                      }
+
+                                      if (!existingTask && candidate.parameters.existing_start_time) {
+                                        existingTask = {
+                                          id: removeId,
+                                          title: candidate.parameters.existing_title,
+                                          start_time: candidate.parameters.existing_start_time,
+                                          end_time: candidate.parameters.existing_end_time
+                                        };
+                                      }
+
                                       const newTaskTime = (val.start_time || candidate.parameters.start_time)
                                         ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time), preferences?.time_format_24h)
                                         : '09:00';
@@ -824,13 +910,13 @@ function App() {
                                       setConflictModal({
                                         isOpen: true,
                                         newTask: {
-                                          title: val.title,
-                                          start_time: val.start_time,
-                                          end_time: val.end_time,
+                                          title: val.title || candidate.parameters.title,
+                                          start_time: val.start_time || candidate.parameters.start_time,
+                                          end_time: val.end_time || candidate.parameters.end_time,
                                           candidateId: candidate.id
                                         },
                                         existingTask: existingTask ? {
-                                          id: existingTask.id,
+                                          id: existingTask.id || removeId,
                                           title: existingTask.title,
                                           start_time: existingTask.start_time,
                                           end_time: existingTask.end_time
@@ -868,38 +954,11 @@ function App() {
                                     } else {
                                       await refreshPreview(jobId);
                                     }
-                                  }}>{label}</button>
+                                  }}>
+                                    <span>{label}</span>
+                                  </button>
                                 )
                               })}
-                              <button className="other-opt-btn" onClick={() => {
-                                let prefillStart = new Date();
-                                let prefillEnd = null;
-                                let prefillTitle = candidate.parameters?.title || candidate.description.replace('Ambiguity: ', '');
-
-                                if (candidate.parameters.options?.length > 0) {
-                                  try {
-                                    const firstOpt = JSON.parse(candidate.parameters.options[0].value);
-                                    if (firstOpt.start_time) prefillStart = new Date(normalizeToUTC(firstOpt.start_time));
-                                    if (firstOpt.end_time) prefillEnd = new Date(normalizeToUTC(firstOpt.end_time));
-                                    if (firstOpt.title) prefillTitle = firstOpt.title;
-                                  } catch (e) { console.error("Failed to parse first option", e); }
-                                }
-
-                                if (!prefillEnd) {
-                                  prefillEnd = new Date(prefillStart.getTime() + 30 * 60 * 1000);
-                                }
-
-                                handleEditOpen({
-                                  id: candidate.id,
-                                  description: prefillTitle,
-                                  parameters: {
-                                    ...candidate.parameters,
-                                    title: prefillTitle,
-                                    start_time: prefillStart.toISOString(),
-                                    end_time: prefillEnd.toISOString()
-                                  }
-                                }, 'candidate');
-                              }}>Other</button>
                               <div style={{ flex: 1 }}></div>
                               <button className="ambiguity-reject-btn" onClick={() => {
                                 setConfirmModal({
