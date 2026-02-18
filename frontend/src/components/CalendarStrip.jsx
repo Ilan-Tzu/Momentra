@@ -8,7 +8,7 @@ const monthNames = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
+const CalendarStrip = ({ tasks, selectedDate, onSelectDate, newlyAddedTaskIds }) => {
     const scrollRef = useRef(null);
 
     // Generate next 30 days
@@ -277,7 +277,7 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
                                             slot.tasks.map((task, taskIdx) => (
                                                 <div
                                                     key={task.id || `${i}-${taskIdx}`}
-                                                    className={`task-bar ${task.isStart ? 'start' : ''} ${task.isEnd ? 'end' : ''} ${task.isMiddle ? 'middle' : ''}`}
+                                                    className={`task-bar ${task.isStart ? 'start' : ''} ${task.isEnd ? 'end' : ''} ${task.isMiddle ? 'middle' : ''} ${newlyAddedTaskIds?.includes(task.id) ? 'newly-added-bar' : ''}`}
                                                     style={{
                                                         width: `${task.width}%`,
                                                         marginLeft: `${task.left}%`,

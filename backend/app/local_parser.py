@@ -25,7 +25,10 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
     try:
         # 2. Extract Date Component
         target_date = base_date
-        date_pattern = r'(tomorrow|today|on\s(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|on\s([a-z]{3,}\s\d{1,2}))'
+        # Support "this Friday", "next Friday", "coming Friday"
+        days_regex = r'(monday|tuesday|wednesday|thursday|friday|saturday|sunday)'
+        modifiers = r'(this|next|coming|on)'
+        date_pattern = rf'(tomorrow|today|(?:{modifiers}\s)?{days_regex}|on\s([a-z]{{3,}}\s\d{{1,2}}))'
         date_match = re.search(date_pattern, text)
         
         if date_match:
@@ -34,23 +37,33 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
                 target_date = base_date + timedelta(days=1)
             elif "today" in match_str:
                 target_date = base_date
-            elif "on " in match_str:
-                day_str = match_str.replace("on ", "").strip()
-                # Try parsing as day of week
+            else:
                 days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                # Clean day_str for parsing/indexing (remove modifiers)
+                day_str = match_str
+                for m in ["this ", "next ", "on ", "coming "]:
+                    day_str = day_str.replace(m, "")
+                day_str = day_str.strip()
+                
                 if day_str in days:
                     current_day = base_date.weekday()
                     target_day = days.index(day_str)
                     days_ahead = target_day - current_day
                     if days_ahead <= 0: days_ahead += 7
+                    
+                    # If user said "next [day]", add another week
+                    if "next" in match_str:
+                        days_ahead += 7
+                        
                     target_date = base_date + timedelta(days=days_ahead)
                 else:
                     # Try parsing as specific date e.g. "Feb 20"
+                    # We still have "on " maybe
                     try:
-                        temp_date = dateutil.parser.parse(day_str)
+                        clean_day = match_str.replace("on ", "").strip()
+                        temp_date = dateutil.parser.parse(clean_day)
                         target_date = datetime.combine(temp_date.date(), base_date.time())
                         if base_date.tzinfo: target_date = target_date.replace(tzinfo=base_date.tzinfo)
-                        # If the date parsed is in the past (e.g. Feb if now is Dec), assume next year
                         if target_date < base_date - timedelta(days=1):
                             target_date = target_date.replace(year=target_date.year + 1)
                     except: pass
@@ -69,9 +82,14 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
         end_str = time_match.group(2)
 
         # 4. PRE-CLEAN TITLE (Needed for both paths)
-        clean_title = text.replace(time_match.group(0), "").strip()
-        for noise in [" a ", " an ", " the ", " schedule ", " set ", " add "]:
-            clean_title = clean_title.replace(noise, " ")
+        # Remove the time match (use regex for whole-word to be safe)
+        temp_title = re.sub(re.escape(time_match.group(0)), ' ', text, flags=re.IGNORECASE).strip()
+        
+        # Strip common leading/trailing prepositions and junk
+        # Including modifiers like 'this' or 'next' if they were left at the end
+        noise_words = r'(schedule|set|add|a|an|the|at|on|for|this|next|coming)'
+        clean_title = re.sub(rf'^{noise_words}\s+', '', temp_title, flags=re.IGNORECASE)
+        clean_title = re.sub(rf'\s+{noise_words}$', '', clean_title, flags=re.IGNORECASE)
             
         # 5. AMBIGUITY DETECTION (Numeric but unclear)
         # If it's "at 8" with no am/pm or colon, we can locally resolve the ambiguity

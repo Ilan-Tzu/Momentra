@@ -21,6 +21,7 @@ function App() {
   const [candidates, setCandidates] = useState([]) // For preview
   const [errorMsg, setErrorMsg] = useState('')
   const [tasksAddedInCurrentSession, setTasksAddedInCurrentSession] = useState(false);
+  const [newlyAddedTaskIds, setNewlyAddedTaskIds] = useState([]);
 
   // User state
   const [user, setUser] = useState(getUser()?.username || '');
@@ -349,6 +350,19 @@ function App() {
 
       if (res.tasks_created?.length > 0) {
         setTasksAddedInCurrentSession(true);
+        const newIds = res.tasks_created.map(t => t.id);
+        setNewlyAddedTaskIds(prev => [...prev, ...newIds]);
+
+        // Take user there (first task)
+        const first = res.tasks_created[0];
+        if (first.start_time) {
+          setSelectedDate(new Date(normalizeToUTC(first.start_time)));
+        }
+
+        // Clear animation
+        setTimeout(() => {
+          setNewlyAddedTaskIds(prev => prev.filter(id => !newIds.includes(id)));
+        }, 5000);
       }
 
       // Use server-provided remaining candidates (which may have been converted to conflicts)
@@ -392,6 +406,19 @@ function App() {
       const res = await jobService.acceptJob(jobId, allIds);
       if (res.tasks_created?.length > 0) {
         setTasksAddedInCurrentSession(true);
+        const newIds = res.tasks_created.map(t => t.id);
+        setNewlyAddedTaskIds(prev => [...prev, ...newIds]);
+
+        // Take user there (first task)
+        const first = res.tasks_created[0];
+        if (first.start_time) {
+          setSelectedDate(new Date(normalizeToUTC(first.start_time)));
+        }
+
+        // Clear animation
+        setTimeout(() => {
+          setNewlyAddedTaskIds(prev => prev.filter(id => !newIds.includes(id)));
+        }, 5000);
       }
       await fetchCalendarTasks();
 
@@ -822,6 +849,7 @@ function App() {
                     tasks={calendarTasks}
                     selectedDate={selectedDate}
                     onSelectDate={handleSelectDate}
+                    newlyAddedTaskIds={newlyAddedTaskIds}
                   />
                 </div>
 
@@ -856,7 +884,7 @@ function App() {
                       else if (task.taskType === 'task-middle') displayTime = 'Continued';
 
                       return (
-                        <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
+                        <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''} ${newlyAddedTaskIds.includes(task.id) ? 'task-newly-added' : ''}`}>
                           <div className="task-time">
                             {displayTime}
                           </div>
