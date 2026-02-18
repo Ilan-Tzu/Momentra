@@ -55,6 +55,7 @@ class AIParseResult(BaseModel):
     ambiguities: List[AIAmbiguity]
 
 from datetime import datetime
+from .local_parser import parse_simple_task
 
 class LLMAdapter:
     def parse_text(self, text: str, user_local_time: str = None, ai_temperature: float = 0.0, personal_context: str = None, user_id: int = None) -> dict:
@@ -85,6 +86,28 @@ class LLMAdapter:
         cached = get_cached_response(text, user_local_time)
         if cached:
             return cached
+            
+        # --- LOCAL GUARD (FAST PATH) ---
+        # Try to parse simple commands locally before hitting the LLM
+        # Only use if temperature is low (user doesn't want creative interpretation)
+        if ai_temperature < 0.3:
+            local_result = parse_simple_task(text, user_local_time)
+            if local_result:
+                print(f"⚡ Local Parser used for: '{text}'")
+                
+                # Log this as a "local" event with 0 cost
+                from .llm_tracking import log_token_usage
+                log_token_usage(
+                    user_id=user_id,
+                    feature="scheduler-local",
+                    model="local-regex",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    latency_ms=10.0 # Approximate
+                )
+                
+                return local_result
         
         # --- MOCK/FALLBACK IF NO KEY ---
         if not client.api_key or client.api_key == "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx":
@@ -134,6 +157,7 @@ class LLMAdapter:
         personal_context_section = f"\nUser context: {personal_context}" if personal_context else ""
 
         system_prompt = f"""You extract scheduling intent into structured JSON. Output all times in UTC (suffix 'Z'). Convert from {timezone_info}.
+MATH RULE: Subtract the offset from local time to get UTC. Example: If TZ is UTC+02:00, then 8:00 AM local = 06:00:00Z.
 
 Date: {current_date_str} | Time: {current_time_str} | TZ: {timezone_info}{personal_context_section}
 
@@ -141,8 +165,12 @@ Upcoming dates:
 {upcoming_days_context}
 
 Rules:
-1. AM/PM RESOLUTION: Resolve AM/PM using context. "Dinner", "Evening", and "Tonight" always imply PM. "Breakfast" and "Morning" always imply AM. If context is clear (e.g., "Dinner at 8", "8 in the evening", "10 in the morning"), extract directly to tasks[]. Do NOT flag as ambiguous.
-2. MANDATORY AMBIGUITY: Only use ambiguities[] if a 12h time is given with NO contextual clues (e.g., "Meeting at 8" with no other info). Never guess in these cases.
+1. AM/PM RESOLUTION: Resolve AM/PM ONLY if explicit contextual clues exist.
+   - PM Clues: "Dinner", "Evening", "Tonight", "Night", "Afternoon".
+   - AM Clues: "Breakfast", "Morning", "Early".
+   - Mixed: "8 in the evening" (PM), "10 in the morning" (AM) are clear.
+   - If a clue exists, extract directly to tasks[]. Do NOT flag as ambiguous.
+2. MANDATORY AMBIGUITY: If a 12h time is given (e.g., "8", "8:30") WITHOUT one of the clues above, you MUST use ambiguities[]. Never guess based on world knowledge (e.g., don't guess "Tennis" is AM or "Meeting" is PM). If the user says "Tennis at 8", and provides no other info, ask AM or PM.
 3. 24h CERTAINTY: 13:00-23:59 (e.g. "17:15") is ALWAYS unambiguous. Never ask AM/PM.
 4. MULTI-DAY RANGES: If the user provides a range (e.g., "Feb 20 - Feb 21"), the start date is the first date and the end date is the second date. Do NOT extend the range further.
 5. LODGING DEFAULTS: For lodging tasks ("Airbnb", "Hotel", "Stay", "Check-in"), if times are not specified, use a default START time of 15:00 (Check-in) and a default END time of 11:00 (Check-out) on their respective start/end dates.

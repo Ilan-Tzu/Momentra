@@ -80,7 +80,7 @@ def call_llm_with_tracking(
         latency_ms = (end_time - start_time) * 1000
         
         if usage_data:
-            _log_token_usage(
+            log_token_usage(
                 user_id=user_id,
                 feature=feature_name,
                 model=model,
@@ -91,21 +91,24 @@ def call_llm_with_tracking(
             )
 
 
-def _log_token_usage(
+def log_token_usage(
     user_id: Optional[int],
     feature: str,
     model: str,
     prompt_tokens: int,
     completion_tokens: int,
     total_tokens: int,
-    latency_ms: float
+    latency_ms: float = 0.0
 ) -> None:
     """
     Saves a TokenLog entry to the database.
     Uses a fresh session to ensure commit even if caller fails.
     """
     # Calculate cost
-    if model == "gpt-4o-mini":
+    if model == "local-regex":
+        input_cost = 0.0
+        output_cost = 0.0
+    elif model == "gpt-4o-mini":
         input_cost = prompt_tokens * GPT_4O_MINI_INPUT_COST_PER_TOKEN
         output_cost = completion_tokens * GPT_4O_MINI_OUTPUT_COST_PER_TOKEN
     else:

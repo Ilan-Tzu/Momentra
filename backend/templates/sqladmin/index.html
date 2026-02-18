@@ -82,7 +82,7 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white border-0 pt-4 px-4">
-                    <h5 class="card-title mb-0">AI Model Usage Breakdown</h5>
+                    <h5 class="card-title mb-0">Usage Breakdown</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -184,8 +184,19 @@
                 tbody.innerHTML = '';
                 models.forEach(m => {
                     const avg = m.calls > 0 ? (m.cost / m.calls).toFixed(5) : '0.00000';
-                    const tr = `<tr>
-                        <td class="fw-bold text-primary">${m.model}</td>
+
+                    let modelDisplay = m.model;
+                    let rowClass = "";
+
+                    if (m.model === 'local-regex') {
+                        modelDisplay = `<span class="badge bg-success text-white">Local Parser (Regex)</span>`;
+                        rowClass = "table-success";
+                    } else {
+                        modelDisplay = `<span class="fw-bold text-primary">${m.model}</span>`;
+                    }
+
+                    const tr = `<tr class="${rowClass}">
+                        <td>${modelDisplay}</td>
                         <td>${m.calls}</td>
                         <td>$${m.cost.toFixed(4)}</td>
                         <td class="text-muted">$${avg}</td>
