@@ -6,30 +6,26 @@ import { Clock, Sun, Moon, Hourglass, Zap, Brain, Calendar, Type } from 'lucide-
 function PreferencesPage({ onClose, isPage = false, preferences, setPreferences }) {
     const [activeTab, setActiveTab] = useState('scheduling');
     const [loading, setLoading] = useState(!preferences);
+    const [localPrefs, setLocalPrefs] = useState(preferences);
+    const [hasChanges, setHasChanges] = useState(false);
     const [saveStatus, setSaveStatus] = useState('');
-
     const [errorMessage, setErrorMessage] = useState(null);
-
-    // Refs for debouncing
-    const saveTimeoutRef = useRef(null);
-    const pendingChangesRef = useRef({});
 
     useEffect(() => {
         if (!preferences) {
             fetchPreferences();
         } else {
+            setLocalPrefs(preferences);
             setLoading(false);
         }
-        return () => {
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, []);
+    }, [preferences]);
 
     const fetchPreferences = async () => {
         setErrorMessage(null);
         try {
             const data = await jobService.getPreferences();
             setPreferences(data);
+            setLocalPrefs(data);
             setLoading(false);
         } catch (error) {
             console.error('Failed to fetch preferences:', error);
@@ -38,40 +34,30 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
         }
     };
 
-    // Optimistic update + Debounced Batch Save
-    const updatePreference = (field, value) => {
-        // 1. Update UI immediately
-        setPreferences(prev => ({
-            ...prev,
-            [field]: value
-        }));
-
-        // 2. Queue the change
-        pendingChangesRef.current[field] = value;
+    const handleSave = async () => {
         setSaveStatus('saving');
         setErrorMessage(null);
-
-        // 3. Clear existing timeout
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
+        try {
+            await jobService.updatePreferences(localPrefs);
+            setPreferences(localPrefs);
+            setHasChanges(false);
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus(''), 2000);
+        } catch (error) {
+            console.error('Failed to update preferences:', error);
+            setSaveStatus('error');
+            setErrorMessage('Failed to save changes. Please try again.');
         }
+    };
 
-        // 4. Set new timeout to save ALL pending changes
-        saveTimeoutRef.current = setTimeout(async () => {
-            const changesToSave = { ...pendingChangesRef.current };
-            pendingChangesRef.current = {}; // Clear queue
-
-            try {
-                await jobService.updatePreferences(changesToSave);
-
-                setSaveStatus('saved');
-                setTimeout(() => setSaveStatus(''), 2000);
-            } catch (error) {
-                console.error('Failed to update preference:', error);
-                setSaveStatus('error');
-                setErrorMessage('Changes unsaved. Please retry or refresh.');
-            }
-        }, 500); // 500ms debounce
+    const updatePreference = (field, value) => {
+        setLocalPrefs(prev => {
+            const updated = { ...prev, [field]: value };
+            // Simple comparison to check for changes
+            const isDifferent = JSON.stringify(updated) !== JSON.stringify(preferences);
+            setHasChanges(isDifferent);
+            return updated;
+        });
     };
 
     if (loading) {
@@ -113,6 +99,11 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                 </div>
 
                 <div className="header-right">
+                    {hasChanges && (
+                        <button className="save-settings-btn" onClick={handleSave} disabled={saveStatus === 'saving'}>
+                            {saveStatus === 'saving' ? 'Saving...' : 'Save Settings'}
+                        </button>
+                    )}
                     {!isPage && <button className="close-btn" onClick={onClose}>×</button>}
                 </div>
             </div>
@@ -126,7 +117,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                     <Clock size={20} className="setting-icon" />
                                     <span className="label-text">Buffer Time</span>
                                 </div>
-                                <span className="label-value">{preferences?.buffer_minutes ?? 15} min</span>
+                                <span className="label-value">{localPrefs?.buffer_minutes ?? 15} min</span>
                             </div>
                             <div className="setting-control">
                                 <input
@@ -134,7 +125,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                     min="5"
                                     max="60"
                                     step="5"
-                                    value={preferences?.buffer_minutes ?? 15}
+                                    value={localPrefs?.buffer_minutes ?? 15}
                                     onChange={(e) => updatePreference('buffer_minutes', parseInt(e.target.value))}
                                 />
                                 <div className="range-labels">
@@ -150,14 +141,14 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                     <Sun size={20} className="setting-icon" />
                                     <span className="label-text">Work Start</span>
                                 </div>
-                                <span className="label-value">{preferences?.work_start_hour ?? 8}:00</span>
+                                <span className="label-value">{localPrefs?.work_start_hour ?? 8}:00</span>
                             </div>
                             <div className="setting-control">
                                 <input
                                     type="range"
                                     min="0"
                                     max="23"
-                                    value={preferences?.work_start_hour ?? 8}
+                                    value={localPrefs?.work_start_hour ?? 8}
                                     onChange={(e) => updatePreference('work_start_hour', parseInt(e.target.value))}
                                 />
                                 <div className="range-labels">
@@ -173,14 +164,14 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                     <Moon size={20} className="setting-icon" />
                                     <span className="label-text">Work End</span>
                                 </div>
-                                <span className="label-value">{preferences?.work_end_hour ?? 22}:00</span>
+                                <span className="label-value">{localPrefs?.work_end_hour ?? 22}:00</span>
                             </div>
                             <div className="setting-control">
                                 <input
                                     type="range"
                                     min="0"
                                     max="23"
-                                    value={preferences?.work_end_hour ?? 22}
+                                    value={localPrefs?.work_end_hour ?? 22}
                                     onChange={(e) => updatePreference('work_end_hour', parseInt(e.target.value))}
                                 />
                                 <div className="range-labels">
@@ -199,7 +190,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                             </div>
                             <div className="setting-control">
                                 <select
-                                    value={preferences?.default_duration_minutes ?? 60}
+                                    value={localPrefs?.default_duration_minutes ?? 60}
                                     onChange={(e) => updatePreference('default_duration_minutes', parseInt(e.target.value))}
                                 >
                                     <option value={30}>30 minutes</option>
@@ -214,13 +205,13 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
 
                 {activeTab === 'ai' && (
                     <div className="settings-section">
-                        <div className="setting-item">
+                        <div className="setting-item full-width">
                             <div className="setting-header">
                                 <div className="setting-label-group">
                                     <Zap size={20} className="setting-icon" />
                                     <span className="label-text">Creativity</span>
                                 </div>
-                                <span className="label-value">{(preferences?.ai_temperature ?? 0).toFixed(1)}</span>
+                                <span className="label-value">{(localPrefs?.ai_temperature ?? 0).toFixed(1)}</span>
                             </div>
                             <div className="setting-control">
                                 <input
@@ -228,7 +219,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                     min="0"
                                     max="1"
                                     step="0.1"
-                                    value={preferences?.ai_temperature ?? 0}
+                                    value={localPrefs?.ai_temperature ?? 0}
                                     onChange={(e) => updatePreference('ai_temperature', parseFloat(e.target.value))}
                                 />
                                 <div className="range-labels">
@@ -250,7 +241,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                                 <textarea
                                     rows="6"
                                     placeholder="e.g., I'm a software engineer, I prefer mornings for deep work, I usually have lunch at 12:30..."
-                                    value={preferences?.personal_context || ''}
+                                    value={localPrefs?.personal_context || ''}
                                     onChange={(e) => updatePreference('personal_context', e.target.value)}
                                     onBlur={(e) => updatePreference('personal_context', e.target.value)}
                                 />
@@ -271,7 +262,7 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                             </div>
                             <div className="setting-control">
                                 <select
-                                    value={preferences?.first_day_of_week ?? 1}
+                                    value={localPrefs?.first_day_of_week ?? 1}
                                     onChange={(e) => updatePreference('first_day_of_week', parseInt(e.target.value))}
                                 >
                                     <option value={0}>Sunday</option>
@@ -290,13 +281,13 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                             <div className="setting-control">
                                 <div className="toggle-container">
                                     <button
-                                        className={`toggle-option ${!preferences?.time_format_24h ? 'active' : ''}`}
+                                        className={`toggle-option ${!localPrefs?.time_format_24h ? 'active' : ''}`}
                                         onClick={() => updatePreference('time_format_24h', false)}
                                     >
                                         12-hour
                                     </button>
                                     <button
-                                        className={`toggle-option ${preferences?.time_format_24h ? 'active' : ''}`}
+                                        className={`toggle-option ${localPrefs?.time_format_24h ? 'active' : ''}`}
                                         onClick={() => updatePreference('time_format_24h', true)}
                                     >
                                         24-hour

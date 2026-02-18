@@ -18,17 +18,21 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
         except: pass
 
     # 1. PRE-CHECK: Is this a clear scheduling intent?
-    # We look for: 'at 5', '5pm', '18:00', '8am', 'tomorrow', 'friday'
-    if not re.search(r'(at\s\d|\d\s?am|\d\s?pm|\d:\d|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)', text):
+    # We look for: 'at 5', '5pm', '18:00', '8am', 'tomorrow', 'friday', or month names
+    months_check = r'(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)'
+    if not re.search(rf'(at\s\d|\d\s?am|\d\s?pm|\d:\d|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|{months_check})', text):
         return None
 
     try:
         # 2. Extract Date Component
         target_date = base_date
-        # Support "this Friday", "next Friday", "coming Friday"
+        # Support "this Friday", "next Friday", "coming Friday", "On Saturday February 28"
         days_regex = r'(monday|tuesday|wednesday|thursday|friday|saturday|sunday)'
+        months_regex = r'(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)'
         modifiers = r'(this|next|coming|on)'
-        date_pattern = rf'(tomorrow|today|(?:{modifiers}\s)?{days_regex}|on\s([a-z]{{3,}}\s\d{{1,2}}))'
+        
+        # Expanded date pattern to support "On Saturday February 28"
+        date_pattern = rf'(tomorrow|today|(?:{modifiers}\s+)?{days_regex}(?:\s+{months_regex}\s+\d{{1,2}})?|(?:on\s+)?{months_regex}\s+\d{{1,2}})'
         date_match = re.search(date_pattern, text)
         
         if date_match:
@@ -75,21 +79,32 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
         # We look for ranges first, then lone times with 'at', then just lone times if they have am/pm or colon
         time_pattern = r'(\d{1,2}(?::\d{2})?\s?(?:am|pm)?)\s?(?:to|at|-|until|—)\s?(\d{1,2}(?::\d{2})?\s?(?:am|pm))|at\s(\d{1,2}(?::\d{2})?\s?(?:am|pm)?)|(\d{1,2}(?::\d{2})?\s?(?:am|pm))'
         time_match = re.search(time_pattern, text)
+        
+        # If no time found, we only proceed if we have a date (Fast-path for "empty tasks")
         if not time_match:
-            return None # No clear time found
-            
-        start_str = time_match.group(1) or time_match.group(3) or time_match.group(4)
-        end_str = time_match.group(2)
+            if not date_match:
+                return None
+            start_str = "9:00am"
+            end_str = None
+        else:
+            start_str = time_match.group(1) or time_match.group(3) or time_match.group(4)
+            end_str = time_match.group(2)
 
         # 4. PRE-CLEAN TITLE (Needed for both paths)
-        # Remove the time match (use regex for whole-word to be safe)
-        temp_title = re.sub(re.escape(time_match.group(0)), ' ', text, flags=re.IGNORECASE).strip()
+        # Remove the time match if it exists
+        if time_match:
+            temp_title = re.sub(re.escape(time_match.group(0)), ' ', text, flags=re.IGNORECASE).strip()
+        else:
+            temp_title = text.strip()
         
         # Strip common leading/trailing prepositions and junk
         # Including modifiers like 'this' or 'next' if they were left at the end
-        noise_words = r'(schedule|set|add|a|an|the|at|on|for|this|next|coming)'
+        noise_words = r'(schedule|set|add|a|an|the|at|on|for|this|next|coming|,|:)'
         clean_title = re.sub(rf'^{noise_words}\s+', '', temp_title, flags=re.IGNORECASE)
         clean_title = re.sub(rf'\s+{noise_words}$', '', clean_title, flags=re.IGNORECASE)
+        
+        # Additional cleanup for any trailing comma or colon that snuck through
+        clean_title = clean_title.strip(', :')
             
         # 5. AMBIGUITY DETECTION (Numeric but unclear)
         # If it's "at 8" with no am/pm or colon, we can locally resolve the ambiguity
@@ -167,6 +182,25 @@ def parse_simple_task(text: str, user_local_time: str = None) -> dict:
             
         iso_start = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         iso_end = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ") if end_dt else None
+        
+        # 8. Handle Empty Tasks as Ambiguities
+        if not clean_title.strip():
+            import json
+            return {
+                "reasoning": "Momentra Fast-Path (Empty Task Detection)",
+                "tasks": [],
+                "commands": [],
+                "ambiguities": [{
+                    "title": "New Event",
+                    "type": "missing_details",
+                    "message": f"I've set the date to {target_date.strftime('%A, %b %d')}, but what is the event?",
+                    "options": [
+                        {"label": "Just block out time (9 AM)", "value": json.dumps({"title": "New Task", "start_time": iso_start})},
+                        {"label": "Manual Adjustment", "value": json.dumps({"keep_both": True, "title": "New Event", "start_time": iso_start})},
+                        {"label": "Discard", "value": json.dumps({"discard": True})}
+                    ]
+                }]
+            }
         
         return {
             "reasoning": "Momentra Fast-Path (Regex/Determined Patterns)",

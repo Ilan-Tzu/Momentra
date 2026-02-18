@@ -137,6 +137,32 @@
     transform: rotate(90deg);
 }
 
+.save-settings-btn {
+    background: var(--theme-mint);
+    color: #0f172a;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px var(--theme-mint-glow);
+    animation: fadeIn 0.3s ease;
+}
+
+.save-settings-btn:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+    box-shadow: 0 6px 20px var(--theme-mint-glow);
+}
+
+.save-settings-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Tab Bar Redesign - Centered Pills */
 .preferences-tabs {
     grid-area: tabs;

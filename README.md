@@ -17,7 +17,8 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Timezone-aware**: Automatically converts between your local time and UTC
 - **Ambiguity resolution**: If you say "meeting at 8" without AM/PM, Momentra asks for clarification (now locally resolved!)
 - **Stay-aware**: Recognizes "Airbnb", "Hotel", or "Stay" and automatically prompts for check-in/out times with educated guesses (3pm/11am)
-- **Hybrid Parsing Architecture**: Uses a local regex-based "Fast Path" to resolve simple tasks instantly (~10ms) without hitting the AI, saving cost and latency.
+- **Hybrid Parsing Architecture**: Uses a local regex-based "Fast Path" to resolve simple tasks instantly (~10ms) without hitting the AI, now with support for advanced date strings like "On Saturday February 28".
+- **Empty-Task Intelligence**: Entering just a date triggers an interactive ambiguity instead of cluttering your calendar, letting you choose between a placeholder, manual adjustment, or discard.
 
 ### Intelligent Conflict Management
 - **Real-time conflict detection**: Knows when you're double-booked before you save
@@ -33,7 +34,10 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 ### Premium User Experience
 - **Glassmorphism design**: Modern, elegant UI with blur effects and gradients
 - **Dual-Mode UI**: Seamlessly switch between focus-driven Modal views and comprehensive Full-Page dashboards
-- **Smooth interactions**: Animated calendar strip with auto-centering on selected dates
+- **Premium UI Polish**: One-way gloss shine effects that glide on hover and reset instantly, paired with custom-stylized action buttons (Pulse-animated Mic, Purple-Gradient Create).
+- **Infinite Scroll-Free Layout**: Compact, optimized dashboard design that fits all critical tools and review modals within the viewport without scrolling.
+- **Precision Clear Tool**: A specialized ghost-red Unicode "✕" for prompt clearing, tucked into the top-right corner with responsive rotation and scale feedback.
+- **Smooth interactions**: Animated calendar strip with auto-centering on selected dates and smooth scrolling hooks for date selection.
 - **Modular Themes**: Specialized skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), Review (Purple Glass), and **Templates (Vibrant Orange/Amber)**
 - **Google Sign-In**: Seamless authentication with OAuth 2.0
 
@@ -101,6 +105,8 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] **Lodging Defaults**: Automatic 15:00/11:00 times for Airbnb/Hotels
 - [x] **Enhanced Event Review**
   - [x] **Standardized Action UI**: 14px rounded buttons with semantic icons (Accept, Reject, Edit)
+  - [x] **Manual Adjustment Shortcut**: Ambiguities now offer a direct path to the full Event Editor.
+  - [x] **Compact Layout**: Reduced padding and gaps for a dense, professional dashboard feel.
   - [x] **Clean Multi-Day Logic**: Range-based display for events spanning multiple days
 - [x] **Unified Event Editing**
   - [x] Cyber-Industrial Theme Modal
@@ -122,6 +128,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] Rate limiting & LLM/Transcription caching
   - [x] JWT with auto-background token refresh
   - [x] Input sanitization with `bleach`
+  - [x] **Z-Index Centering**: Perfectly balanced modals that sit above all navigation.
 
 ---
 
@@ -223,4 +230,4 @@ Private - All Rights Reserved
 ---
 
 **Last Updated**: February 18, 2026  
-**Version**: 0.9.7-alpha
+**Version**: 0.9.8-alpha

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { jobService } from './services/api'
-import { Trash2, Edit3, Check, X } from 'lucide-react'
+import { Trash2, Edit3, Check, X, Plus } from 'lucide-react'
 import CalendarStrip from './components/CalendarStrip'
 import ConfirmModal from './components/ConfirmModal'
 import Navbar from './components/Navbar'
@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage'
 import EditEventModal from './components/EditEventModal'
 import PreferencesPage from './components/PreferencesPage'
 import TemplatesPage from './components/TemplatesPage'
+import FullCalendarModal from './components/FullCalendarModal'
 import './App.css'
 import './mobile.css'
 
@@ -71,6 +72,8 @@ function App() {
     onConfirm: () => { },
     isDestructive: false
   });
+
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   // Search State
   const [searchModal, setSearchModal] = useState({
@@ -144,7 +147,29 @@ function App() {
   }, [user])
   const handleSelectDate = (date) => {
     setSelectedDate(date);
-    // Removed auto-scroll here as it conflicts with 'only scroll if added' logic
+    // Smoothly scroll the schedule into view when a day is picked
+    if (scheduleRef.current) {
+      scheduleRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleQuickAdd = () => {
+    const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const fullDate = selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    setRawText(`On ${dayName} ${fullDate}, `);
+
+    // Smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Focus textarea
+    setTimeout(() => {
+      const textarea = document.querySelector('textarea');
+      if (textarea) {
+        textarea.focus();
+        // Move cursor to end
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      }
+    }, 500);
   };
 
   useEffect(() => {
@@ -793,8 +818,7 @@ function App() {
 
             {/* Home: Input Card */}
             <div className="input-card">
-              <div className="input-wrapper" style={{ display: 'flex', gap: '16px', flex: 1 }}>
-
+              <div className="input-wrapper" style={{ display: 'flex', gap: '16px', flex: 1, position: 'relative' }}>
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
@@ -811,6 +835,21 @@ function App() {
                   rows={3}
                   style={{ margin: 0 }} /* Remove margin since wrapper handles gap */
                 />
+                {rawText && (
+                  <button
+                    className="clear-prompt-btn"
+                    onClick={() => {
+                      setRawText('');
+                      setTimeout(() => {
+                        const textarea = document.querySelector('textarea');
+                        if (textarea) textarea.focus();
+                      }, 0);
+                    }}
+                    title="Clear prompt"
+                  >
+                    <span style={{ fontSize: '18px', fontWeight: '800' }}>✕</span>
+                  </button>
+                )}
               </div>
               <div className="input-actions">
                 <button
@@ -859,10 +898,13 @@ function App() {
                     <span className="schedule-date-label">{selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div className="event-badge-premium">
-                      <span className="event-count">{selectedDayTasks.length}</span>
-                      <span className="event-label">{selectedDayTasks.length === 1 ? 'event' : 'events'}</span>
-                    </div>
+                    <button
+                      className="quick-add-btn"
+                      onClick={handleQuickAdd}
+                      title={`Add event on ${selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`}
+                    >
+                      <Plus size={20} strokeWidth={3} />
+                    </button>
                     <button
                       className="search-btn"
                       onClick={handleSearchOpen}
@@ -870,10 +912,17 @@ function App() {
                     >
                       <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
                     </button>
+                    <button
+                      className="calendar-toggle-btn"
+                      onClick={() => setIsCalendarModalOpen(true)}
+                      title="Open full calendar"
+                    >
+                      <span style={{ fontSize: '18px' }}>🗓</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="day-tasks-list">
+                <div className="day-tasks-list" key={selectedDate.toDateString()}>
                   {selectedDayTasks.length === 0 ? (
                     <p className="empty-tasks">No events scheduled</p>
                   ) : (
@@ -1064,6 +1113,23 @@ function App() {
                                         };
                                       }
 
+                                      if (!existingTask) {
+                                        // If no conflict, open the full editor directly
+                                        handleEditOpen({
+                                          ...candidate,
+                                          title: val.title || candidate.parameters.title || 'New Event',
+                                          start_time: val.start_time || candidate.parameters.start_time,
+                                          end_time: val.end_time || candidate.parameters.end_time,
+                                          parameters: {
+                                            ...candidate.parameters,
+                                            title: val.title || candidate.parameters.title || 'New Event',
+                                            start_time: val.start_time || candidate.parameters.start_time,
+                                            end_time: val.end_time || candidate.parameters.end_time
+                                          }
+                                        }, 'candidate');
+                                        return;
+                                      }
+
                                       const newTaskTime = (val.start_time || candidate.parameters.start_time)
                                         ? formatToLocalTime(normalizeToUTC(val.start_time || candidate.parameters.start_time), preferences?.time_format_24h)
                                         : '09:00';
@@ -1079,13 +1145,13 @@ function App() {
                                           end_time: val.end_time || candidate.parameters.end_time,
                                           candidateId: candidate.id
                                         },
-                                        existingTask: existingTask ? {
+                                        existingTask: {
                                           id: existingTask.id || removeId,
                                           title: existingTask.title,
                                           start_time: existingTask.start_time,
                                           end_time: existingTask.end_time,
                                           isCandidate: existingTask.isCandidate || isExistingCandidate
-                                        } : null,
+                                        },
                                         newTaskTime,
                                         existingTaskTime,
                                         newTaskDate: val.start_time ? toLocalISOString(new Date(val.start_time)).split('T')[0] : toLocalISOString(new Date()).split('T')[0],
@@ -1346,6 +1412,16 @@ function App() {
             onSave={handleEditSave}
             event={editModal.event}
             type={editModal.type}
+          />
+
+          {/* Full Calendar Modal */}
+          <FullCalendarModal
+            isOpen={isCalendarModalOpen}
+            onClose={() => setIsCalendarModalOpen(false)}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            tasks={calendarTasks}
+            use24HourFormat={preferences?.time_format_24h}
           />
 
           {/* Confirmation Modal */}

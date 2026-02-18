@@ -40,11 +40,34 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    position: relative;
+    overflow: hidden;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.15) 50%,
+            transparent 70%);
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+
+    pointer-events: none;
 }
 
 .nav-link:hover {
     color: white;
     background: rgba(139, 92, 246, 0.1);
+}
+
+.nav-link:hover::after {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+    transition: transform 0.6s ease;
 }
 
 .nav-link.active {
@@ -67,11 +90,34 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    position: relative;
+    overflow: hidden;
+}
+
+.nav-logout::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.2) 50%,
+            transparent 70%);
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+
+    pointer-events: none;
 }
 
 .nav-logout:hover {
     background: rgba(239, 68, 68, 0.25);
     color: #FECACA;
+}
+
+.nav-logout:hover::after {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+    transition: transform 0.6s ease;
 }
 
 .hamburger {
