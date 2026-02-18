@@ -298,8 +298,7 @@ def update_preferences(
 
 @router.get("/admin/stats")
 def get_admin_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """
     Returns aggregated analytics for the admin dashboard.

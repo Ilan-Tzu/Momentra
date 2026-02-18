@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './PreferencesPage.css';
 import { jobService } from '../services/api';
+import { Clock, Sun, Moon, Hourglass, Zap, Brain, Calendar, Type } from 'lucide-react';
 
 function PreferencesPage({ onClose, isPage = false, preferences, setPreferences }) {
     const [activeTab, setActiveTab] = useState('scheduling');
@@ -86,91 +87,127 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
     const content = (
         <>
             <div className="preferences-header">
-                <h2>Preferences</h2>
-                {!isPage && <button className="close-btn" onClick={onClose}>×</button>}
-            </div>
+                <div className="header-left">
+                    <h2>Preferences</h2>
+                </div>
 
-            <div className="preferences-tabs">
-                <button
-                    className={`tab ${activeTab === 'scheduling' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('scheduling')}
-                >
-                    Scheduling
-                </button>
-                <button
-                    className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('ai')}
-                >
-                    AI Behavior
-                </button>
-                <button
-                    className={`tab ${activeTab === 'display' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('display')}
-                >
-                    Display
-                </button>
+                <div className="preferences-tabs">
+                    <button
+                        className={`tab ${activeTab === 'scheduling' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('scheduling')}
+                    >
+                        Scheduling
+                    </button>
+                    <button
+                        className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('ai')}
+                    >
+                        AI Behavior
+                    </button>
+                    <button
+                        className={`tab ${activeTab === 'display' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('display')}
+                    >
+                        Display
+                    </button>
+                </div>
+
+                <div className="header-right">
+                    {!isPage && <button className="close-btn" onClick={onClose}>×</button>}
+                </div>
             </div>
 
             <div className="preferences-body">
                 {activeTab === 'scheduling' && (
                     <div className="settings-section">
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">Buffer Time Between Events</span>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Clock size={20} className="setting-icon" />
+                                    <span className="label-text">Buffer Time</span>
+                                </div>
                                 <span className="label-value">{preferences?.buffer_minutes ?? 15} min</span>
-                            </label>
-                            <input
-                                type="range"
-                                min="5"
-                                max="60"
-                                step="5"
-                                value={preferences?.buffer_minutes ?? 15}
-                                onChange={(e) => updatePreference('buffer_minutes', parseInt(e.target.value))}
-                            />
+                            </div>
+                            <div className="setting-control">
+                                <input
+                                    type="range"
+                                    min="5"
+                                    max="60"
+                                    step="5"
+                                    value={preferences?.buffer_minutes ?? 15}
+                                    onChange={(e) => updatePreference('buffer_minutes', parseInt(e.target.value))}
+                                />
+                                <div className="range-labels">
+                                    <span>5m</span>
+                                    <span>60m</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">Working Hours Start</span>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Sun size={20} className="setting-icon" />
+                                    <span className="label-text">Work Start</span>
+                                </div>
                                 <span className="label-value">{preferences?.work_start_hour ?? 8}:00</span>
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="23"
-                                value={preferences?.work_start_hour ?? 8}
-                                onChange={(e) => updatePreference('work_start_hour', parseInt(e.target.value))}
-                            />
+                            </div>
+                            <div className="setting-control">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="23"
+                                    value={preferences?.work_start_hour ?? 8}
+                                    onChange={(e) => updatePreference('work_start_hour', parseInt(e.target.value))}
+                                />
+                                <div className="range-labels">
+                                    <span>0:00</span>
+                                    <span>23:00</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">Working Hours End</span>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Moon size={20} className="setting-icon" />
+                                    <span className="label-text">Work End</span>
+                                </div>
                                 <span className="label-value">{preferences?.work_end_hour ?? 22}:00</span>
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="23"
-                                value={preferences?.work_end_hour ?? 22}
-                                onChange={(e) => updatePreference('work_end_hour', parseInt(e.target.value))}
-                            />
+                            </div>
+                            <div className="setting-control">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="23"
+                                    value={preferences?.work_end_hour ?? 22}
+                                    onChange={(e) => updatePreference('work_end_hour', parseInt(e.target.value))}
+                                />
+                                <div className="range-labels">
+                                    <span>0:00</span>
+                                    <span>23:00</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">Default Event Duration</span>
-                                <span className="label-value">{preferences?.default_duration_minutes ?? 60} min</span>
-                            </label>
-                            <select
-                                value={preferences?.default_duration_minutes ?? 60}
-                                onChange={(e) => updatePreference('default_duration_minutes', parseInt(e.target.value))}
-                            >
-                                <option value={30}>30 min</option>
-                                <option value={60}>60 min</option>
-                                <option value={90}>90 min</option>
-                                <option value={120}>120 min</option>
-                            </select>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Hourglass size={20} className="setting-icon" />
+                                    <span className="label-text">Default Duration</span>
+                                </div>
+                            </div>
+                            <div className="setting-control">
+                                <select
+                                    value={preferences?.default_duration_minutes ?? 60}
+                                    onChange={(e) => updatePreference('default_duration_minutes', parseInt(e.target.value))}
+                                >
+                                    <option value={30}>30 minutes</option>
+                                    <option value={60}>1 hour</option>
+                                    <option value={90}>1.5 hours</option>
+                                    <option value={120}>2 hours</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -178,33 +215,47 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                 {activeTab === 'ai' && (
                     <div className="settings-section">
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">AI Creativity Level</span>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Zap size={20} className="setting-icon" />
+                                    <span className="label-text">Creativity</span>
+                                </div>
                                 <span className="label-value">{(preferences?.ai_temperature ?? 0).toFixed(1)}</span>
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={preferences?.ai_temperature ?? 0}
-                                onChange={(e) => updatePreference('ai_temperature', parseFloat(e.target.value))}
-                            />
-                            <p className="setting-hint">Higher values make the AI more creative and unpredictable</p>
+                            </div>
+                            <div className="setting-control">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={preferences?.ai_temperature ?? 0}
+                                    onChange={(e) => updatePreference('ai_temperature', parseFloat(e.target.value))}
+                                />
+                                <div className="range-labels">
+                                    <span>Precise</span>
+                                    <span>Creative</span>
+                                </div>
+                            </div>
+                            <p className="setting-hint">Control how predictable or creative the AI should be.</p>
                         </div>
 
                         <div className="setting-item full-width">
-                            <label>
-                                <span className="label-text">Personal Context</span>
-                            </label>
-                            <textarea
-                                rows="6"
-                                placeholder="e.g., I'm a software engineer, I prefer mornings for deep work, I usually have lunch at 12:30..."
-                                value={preferences?.personal_context || ''}
-                                onChange={(e) => updatePreference('personal_context', e.target.value)}
-                                onBlur={(e) => updatePreference('personal_context', e.target.value)}
-                            />
-                            <p className="setting-hint">This context will be added to AI prompts to personalize suggestions</p>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Brain size={20} className="setting-icon" />
+                                    <span className="label-text">Personal Context</span>
+                                </div>
+                            </div>
+                            <div className="setting-control">
+                                <textarea
+                                    rows="6"
+                                    placeholder="e.g., I'm a software engineer, I prefer mornings for deep work, I usually have lunch at 12:30..."
+                                    value={preferences?.personal_context || ''}
+                                    onChange={(e) => updatePreference('personal_context', e.target.value)}
+                                    onBlur={(e) => updatePreference('personal_context', e.target.value)}
+                                />
+                            </div>
+                            <p className="setting-hint">This context is added to every AI prompt to tailor the schedule to you.</p>
                         </div>
                     </div>
                 )}
@@ -212,35 +263,45 @@ function PreferencesPage({ onClose, isPage = false, preferences, setPreferences 
                 {activeTab === 'display' && (
                     <div className="settings-section">
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">First Day of Week</span>
-                            </label>
-                            <select
-                                value={preferences?.first_day_of_week ?? 1}
-                                onChange={(e) => updatePreference('first_day_of_week', parseInt(e.target.value))}
-                            >
-                                <option value={0}>Sunday</option>
-                                <option value={1}>Monday</option>
-                            </select>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Calendar size={20} className="setting-icon" />
+                                    <span className="label-text">First Day of Week</span>
+                                </div>
+                            </div>
+                            <div className="setting-control">
+                                <select
+                                    value={preferences?.first_day_of_week ?? 1}
+                                    onChange={(e) => updatePreference('first_day_of_week', parseInt(e.target.value))}
+                                >
+                                    <option value={0}>Sunday</option>
+                                    <option value={1}>Monday</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="setting-item">
-                            <label>
-                                <span className="label-text">Time Format</span>
-                            </label>
-                            <div className="toggle-container">
-                                <button
-                                    className={`toggle-option ${!preferences?.time_format_24h ? 'active' : ''}`}
-                                    onClick={() => updatePreference('time_format_24h', false)}
-                                >
-                                    12-hour (2:00 PM)
-                                </button>
-                                <button
-                                    className={`toggle-option ${preferences?.time_format_24h ? 'active' : ''}`}
-                                    onClick={() => updatePreference('time_format_24h', true)}
-                                >
-                                    24-hour (14:00)
-                                </button>
+                            <div className="setting-header">
+                                <div className="setting-label-group">
+                                    <Type size={20} className="setting-icon" />
+                                    <span className="label-text">Time Format</span>
+                                </div>
+                            </div>
+                            <div className="setting-control">
+                                <div className="toggle-container">
+                                    <button
+                                        className={`toggle-option ${!preferences?.time_format_24h ? 'active' : ''}`}
+                                        onClick={() => updatePreference('time_format_24h', false)}
+                                    >
+                                        12-hour
+                                    </button>
+                                    <button
+                                        className={`toggle-option ${preferences?.time_format_24h ? 'active' : ''}`}
+                                        onClick={() => updatePreference('time_format_24h', true)}
+                                    >
+                                        24-hour
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

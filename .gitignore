@@ -6,6 +6,21 @@ backend/*.db
 backend/.pytest_cache/
 backend/alembic/versions/*.pyc
 
+# Python Global
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Database Global
+*.db
+*.sqlite3
+
 # Frontend
 frontend/.env
 frontend/.env.local
@@ -15,9 +30,12 @@ frontend/.env.production.local
 frontend/node_modules/
 frontend/dist/
 frontend/stats.html
+node_modules/
 
 # General
 .DS_Store
 .env
 .agent/
 *.log
+.vscode/
+.idea/

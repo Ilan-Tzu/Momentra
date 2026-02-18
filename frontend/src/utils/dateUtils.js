@@ -72,10 +72,23 @@ export const formatToLocalDate = (dateObj) => {
         '-' + pad(dateObj.getDate());
 };
 
-export const handleTimeShift = (timeStr, deltaMinutes) => {
-    if (!timeStr) return '09:00';
+export const handleTimeShift = (timeStr, deltaMinutes, dateStr = null) => {
+    if (!timeStr) return dateStr ? { time: '09:00', date: dateStr } : '09:00';
+
+    // Default to today if dateStr is not provided
+    const baseDate = dateStr || new Date().toISOString().split('T')[0];
     const [h, m] = timeStr.split(':').map(Number);
-    const d = new Date();
+
+    // Create date object in LOCAL time
+    const d = new Date(baseDate.replace(/-/g, '/')); // Use / for better cross-browser compatibility with date-only strings
     d.setHours(h, m + deltaMinutes);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    const pad = (num) => String(num).padStart(2, '0');
+    const newTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const newDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (dateStr) {
+        return { time: newTime, date: newDate };
+    }
+    return newTime;
 };

@@ -73,9 +73,29 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
     };
 
     const handleShift = (field, delta) => {
-        const current = form[field];
-        const shifted = handleTimeShift(current, delta);
-        updateField(field, shifted);
+        const isStart = field === 'start_time';
+        const dateField = isStart ? 'start_date' : 'end_date';
+        const { time, date } = handleTimeShift(form[field], delta, form[dateField]);
+
+        setForm(prev => {
+            const next = { ...prev, [field]: time, [dateField]: date };
+
+            // Re-apply the duration logic if start changed
+            if (isStart) {
+                const oldStart = new Date(`${prev.start_date}T${prev.start_time}`);
+                const oldEnd = new Date(`${prev.end_date}T${prev.end_time}`);
+                const durationMs = oldEnd.getTime() - oldStart.getTime();
+
+                const newStart = new Date(`${next.start_date}T${next.start_time}`);
+                if (!isNaN(newStart.getTime()) && !isNaN(durationMs)) {
+                    const newEnd = new Date(newStart.getTime() + durationMs);
+                    const localISO = toLocalISOString(newEnd);
+                    next.end_date = localISO.split('T')[0];
+                    next.end_time = localISO.split('T')[1].substring(0, 5);
+                }
+            }
+            return next;
+        });
     };
 
     const handleSaveClick = () => {

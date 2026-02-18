@@ -960,19 +960,24 @@ function App() {
                                 )
                               })}
                               <div style={{ flex: 1 }}></div>
-                              <button className="ambiguity-reject-btn" onClick={() => {
-                                setConfirmModal({
-                                  isOpen: true,
-                                  title: 'Reject Event',
-                                  message: 'Are you sure you want to reject this event?',
-                                  isDestructive: true,
-                                  onConfirm: async () => {
-                                    await jobService.deleteJobCandidate(candidate.id);
-                                    await refreshPreview(jobId);
-                                    closeConfirm();
-                                  }
-                                });
-                              }}>Reject</button>
+                              {/* Only show generic Reject if no explicit 'Discard' option exists */}
+                              {!candidate.parameters.options?.some(opt => {
+                                try { return JSON.parse(opt.value).discard; } catch { return false; }
+                              }) && (
+                                  <button className="ambiguity-reject-btn" onClick={() => {
+                                    setConfirmModal({
+                                      isOpen: true,
+                                      title: 'Reject Event',
+                                      message: 'Are you sure you want to reject this event?',
+                                      isDestructive: true,
+                                      onConfirm: async () => {
+                                        await jobService.deleteJobCandidate(candidate.id);
+                                        await refreshPreview(jobId);
+                                        closeConfirm();
+                                      }
+                                    });
+                                  }}>Reject</button>
+                                )}
                             </div>
                           </div>
                         ) : (
@@ -1056,12 +1061,12 @@ function App() {
                             <div className="time-control-group">
                               <div className="arrow-stack">
                                 <button className="arrow-btn" onClick={() => {
-                                  const shifted = handleTimeShift(conflictModal.newTaskTime, 30);
-                                  setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
+                                  const { time, date } = handleTimeShift(conflictModal.newTaskTime, 30, conflictModal.newTaskDate);
+                                  setConflictModal(prev => ({ ...prev, newTaskTime: time, newTaskDate: date }));
                                 }}>▲</button>
                                 <button className="arrow-btn" onClick={() => {
-                                  const shifted = handleTimeShift(conflictModal.newTaskTime, -30);
-                                  setConflictModal(prev => ({ ...prev, newTaskTime: shifted }));
+                                  const { time, date } = handleTimeShift(conflictModal.newTaskTime, -30, conflictModal.newTaskDate);
+                                  setConflictModal(prev => ({ ...prev, newTaskTime: time, newTaskDate: date }));
                                 }}>▼</button>
                               </div>
                               <input
@@ -1094,12 +1099,12 @@ function App() {
                               <div className="time-control-group">
                                 <div className="arrow-stack">
                                   <button className="arrow-btn" onClick={() => {
-                                    const shifted = handleTimeShift(conflictModal.existingTaskTime, 30);
-                                    setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
+                                    const { time, date } = handleTimeShift(conflictModal.existingTaskTime, 30, conflictModal.existingTaskDate);
+                                    setConflictModal(prev => ({ ...prev, existingTaskTime: time, existingTaskDate: date }));
                                   }}>▲</button>
                                   <button className="arrow-btn" onClick={() => {
-                                    const shifted = handleTimeShift(conflictModal.existingTaskTime, -30);
-                                    setConflictModal(prev => ({ ...prev, existingTaskTime: shifted }));
+                                    const { time, date } = handleTimeShift(conflictModal.existingTaskTime, -30, conflictModal.existingTaskDate);
+                                    setConflictModal(prev => ({ ...prev, existingTaskTime: time, existingTaskDate: date }));
                                   }}>▼</button>
                                 </div>
                                 <input
@@ -1233,7 +1238,7 @@ function App() {
       )}
 
       {activePage === 'preferences' && (
-        <div style={{ marginTop: '80px', padding: '20px', maxWidth: '900px', margin: '80px auto 0' }}>
+        <div className="preferences-top-container">
           <PreferencesPage
             isPage={true}
             preferences={preferences}
