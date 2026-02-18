@@ -68,9 +68,12 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
         // 1. Prepare all tasks that have start/end times
         const allTasks = tasks.map(task => {
             try {
-                if (!task.start_time || !task.end_time) return null;
+                if (!task.start_time) return null;
                 const start = new Date(normalizeToUTC(task.start_time));
-                const end = new Date(normalizeToUTC(task.end_time));
+                let end = task.end_time ? new Date(normalizeToUTC(task.end_time)) : null;
+                if (!end || isNaN(end.getTime())) {
+                    end = new Date(start.getTime() + 30 * 60000);
+                }
                 return { ...task, start, end };
             } catch (e) { return null; }
         }).filter(Boolean);
@@ -127,10 +130,13 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
             dayEnd.setDate(dayEnd.getDate() + 1);
 
             tasks.forEach(task => {
-                if (!task.start_time || !task.end_time) return;
+                if (!task.start_time) return;
                 try {
                     const taskStart = new Date(normalizeToUTC(task.start_time));
-                    const taskEnd = new Date(normalizeToUTC(task.end_time));
+                    let taskEnd = task.end_time ? new Date(normalizeToUTC(task.end_time)) : null;
+                    if (!taskEnd || isNaN(taskEnd.getTime())) {
+                        taskEnd = new Date(taskStart.getTime() + 30 * 60000);
+                    }
 
                     if (taskStart < dayEnd && taskEnd > dayStart) {
                         const lane = taskLanes.get(task.id) ?? 0;
@@ -155,10 +161,13 @@ const CalendarStrip = ({ tasks, selectedDate, onSelectDate }) => {
         const dayTasks = [];
 
         tasks.forEach(task => {
-            if (!task.start_time || !task.end_time) return;
+            if (!task.start_time) return;
             try {
                 const taskStart = new Date(normalizeToUTC(task.start_time));
-                const taskEnd = new Date(normalizeToUTC(task.end_time));
+                let taskEnd = task.end_time ? new Date(normalizeToUTC(task.end_time)) : null;
+                if (!taskEnd || isNaN(taskEnd.getTime())) {
+                    taskEnd = new Date(taskStart.getTime() + 30 * 60000);
+                }
 
                 if (taskStart < dayEnd && taskEnd > dayStart) {
                     const startLocalStr = toLocalISOString(taskStart).split('T')[0];

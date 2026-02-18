@@ -36,190 +36,211 @@
 }
 
 /* =============================================================================
-   MOBILE (max-width: 480px)
+   MOBILE (max-width: 600px) - Unified Mobile View
    ============================================================================= */
-@media screen and (max-width: 480px) {
+@media screen and (max-width: 600px) {
 
-    /* Navbar */
-    .navbar {
-        padding: 10px 16px;
+    /* Global layout fixes */
+    body {
+        overflow-x: hidden;
+        width: 100vw;
+        padding-top: 64px;
+        /* Essential for fixed navbar */
     }
 
+    .container {
+        padding: 12px 16px;
+        max-width: 100% !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        gap: 12px;
+        min-height: calc(100vh - 64px);
+        justify-content: flex-start !important;
+    }
+
+    /* Navbar overlaps are handled in Navbar.css, but ensure brand size fits */
     .navbar-brand {
         font-size: 18px;
     }
 
-    .navbar-links {
-        gap: 4px;
+    /* Hero Section - Proportional Scaling */
+    .hero-section {
+        padding: 0 0 12px;
     }
 
-    .nav-link {
-        padding: 8px 12px;
-        font-size: 13px;
+    .hero-section h1 {
+        font-size: 8vw;
+        /* Proportional to viewport width */
+        margin-bottom: 8px;
+        white-space: nowrap;
     }
 
-    .nav-logout {
-        padding: 6px 10px;
-        font-size: 12px;
-    }
-
-    /* Body padding for fixed navbar */
-    body {
-        padding-top: 56px;
-    }
-
-    /* Container */
-    .container {
-        padding: 12px;
-        max-width: 100%;
-        gap: 12px;
+    .hero-section p {
+        font-size: 3.2vw;
+        /* Proportional to viewport width */
+        padding: 6px 16px;
+        opacity: 0.9;
+        margin-bottom: 8px;
     }
 
     /* Calendar Strip */
     .calendar-strip {
         gap: 8px;
-        padding: 8px 2px;
-        /* Enable momentum scrolling on iOS */
+        padding: 8px 0;
         -webkit-overflow-scrolling: touch;
     }
 
     .calendar-day-btn {
         min-width: 70px;
         height: 90px;
-        padding: 12px 8px;
+        padding: 10px 8px;
         border-radius: 12px;
-    }
-
-    .day-name {
-        font-size: 10px;
     }
 
     .day-number {
         font-size: 20px;
     }
 
-    .month-name {
-        font-size: 10px;
-    }
-
     /* Input Card */
     .input-card {
         padding: 16px;
-        border-radius: 16px;
-        margin-bottom: 16px;
+        border-radius: 20px;
+        margin-bottom: 12px;
+    }
+
+    .input-wrapper {
+        gap: 12px !important;
     }
 
     textarea {
         font-size: 16px;
-        /* Prevents iOS zoom on focus */
-    }
-
-    /* Task List */
-    .task-list {
-        gap: 8px;
-    }
-
-    .task-item {
-        padding: 12px;
-        border-radius: 12px;
-    }
-
-    .task-time {
-        font-size: 12px;
-    }
-
-    .task-title {
-        font-size: 14px;
-    }
-
-    /* Preview Modal */
-    .review-overlay {
-        padding: 12px;
-        align-items: flex-end;
-        /* Slide up from bottom on mobile */
-    }
-
-    .review-modal {
-        max-height: 85vh;
-        border-radius: 20px 20px 0 0;
-        margin-bottom: 0;
-    }
-
-    .review-header h2 {
-        font-size: 18px;
-    }
-
-    .candidate-card {
-        padding: 12px;
-    }
-
-    .candidate-meta span {
-        font-size: 11px;
-    }
-
-    /* Conflict Modal */
-    .conflict-modal {
-        padding: 16px;
-        border-radius: 20px 20px 0 0;
-        max-height: 90vh;
-    }
-
-    .conflict-task-card {
-        padding: 12px;
-    }
-
-    .conflict-task-card h4 {
-        font-size: 14px;
-    }
-
-    /* Edit Modal */
-    .edit-modal-overlay {
-        padding: 0;
-        align-items: flex-end;
-    }
-
-    .edit-modal {
-        border-radius: 20px 20px 0 0;
-        max-height: 90vh;
-        width: 100%;
-        max-width: 100%;
-    }
-
-    /* Time inputs - prevent zoom */
-    input[type="time"],
-    input[type="date"],
-    input[type="text"] {
-        font-size: 16px;
-    }
-
-    /* Buttons */
-    .create-btn,
-    .voice-btn {
-        padding: 12px;
-        font-size: 14px;
+        /* Prevents iOS zoom */
+        line-height: 1.4;
     }
 
     .input-actions {
         gap: 8px;
     }
 
+    .create-btn {
+        padding: 12px 16px;
+        font-size: 15px;
+    }
+
+    .mic-btn {
+        width: 48px;
+        height: 48px;
+    }
+
+    /* Upcoming Events Header */
+    .section-header {
+        font-size: 20px;
+        margin-bottom: 12px;
+    }
+
+    .calendar-dashboard-card {
+        padding: 16px;
+        border-radius: 20px;
+    }
+
+    /* Day Tasks Header */
+    .day-tasks-header {
+        margin-top: 16px;
+        padding: 0 4px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .schedule-day-name {
+        font-size: 19px;
+    }
+
+    .schedule-date-label {
+        font-size: 12px;
+    }
+
+    .event-badge-premium {
+        height: 44px;
+        min-width: 70px;
+        padding: 0 12px;
+    }
+
+    .event-count {
+        font-size: 16px;
+    }
+
+    /* Task Rows */
+    .task-row {
+        padding: 14px 16px;
+        border-radius: 16px;
+        gap: 12px;
+    }
+
+    .task-time {
+        font-size: 11px;
+        min-width: 70px;
+    }
+
+    .task-content h4 {
+        font-size: 15px;
+        line-height: 1.3;
+    }
+
+    .task-actions {
+        gap: 4px;
+    }
+
+    .icon-btn {
+        padding: 8px;
+        font-size: 16px;
+    }
+
+    /* Modals - Standardize Bottom sheet behavior for all */
+    .review-overlay,
+    .edit-modal-overlay,
+    .conflict-overlay {
+        padding: 0;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+    .review-modal,
+    .edit-modal,
+    .conflict-modal {
+        width: 100vw;
+        max-height: 90vh;
+        border-radius: 24px 24px 0 0;
+        margin-bottom: 0;
+        padding: 20px 16px 32px;
+        overflow-y: auto;
+    }
+
+    /* Time inputs - prevent zoom */
+    input[type="time"],
+    input[type="date"],
+    input[type="text"],
+    select {
+        font-size: 16px !important;
+    }
+
     /* Toast */
     .toast {
         bottom: 20px;
-        left: 16px;
-        right: 16px;
+        left: 12px;
+        right: 12px;
         width: auto;
         font-size: 14px;
     }
 }
 
 /* =============================================================================
-   TABLET (481px - 768px)
+   TABLET (601px - 768px)
    ============================================================================= */
-@media screen and (min-width: 481px) and (max-width: 768px) {
+@media screen and (min-width: 601px) and (max-width: 768px) {
     .container {
-        max-width: 600px;
-        padding: 16px;
+        max-width: 600px !important;
+        padding: 20px;
     }
 
     .calendar-strip {
@@ -230,31 +251,16 @@
         min-width: 80px;
         height: 100px;
     }
-
-    .review-modal {
-        max-width: 90%;
-    }
-
-    .edit-modal {
-        max-width: 500px;
-    }
 }
 
 /* =============================================================================
    LANDSCAPE MOBILE
    ============================================================================= */
 @media screen and (max-width: 768px) and (orientation: landscape) {
-    body {
-        padding-top: 50px;
-    }
-
-    .navbar {
-        padding: 8px 16px;
-    }
-
     .container {
         min-height: auto;
-        padding-bottom: 20px;
+        padding-top: 72px;
+        padding-bottom: 24px;
     }
 
     .calendar-strip {
@@ -266,52 +272,42 @@
         min-width: 65px;
     }
 
-    .day-number {
-        font-size: 18px;
-    }
-
-    /* Modals in landscape */
-    .review-overlay,
-    .edit-modal-overlay {
-        align-items: center;
-    }
-
     .review-modal,
     .edit-modal,
     .conflict-modal {
-        max-height: 80vh;
-        border-radius: 16px;
+        max-height: 85vh;
+        border-radius: 20px;
+        margin: 20px;
+        width: calc(100vw - 40px);
     }
 }
 
 /* =============================================================================
-   SAFE AREA INSETS (for notched phones)
+   SAFE AREA INSETS
    ============================================================================= */
 @supports (padding: max(0px)) {
-    body {
-        padding-left: max(12px, env(safe-area-inset-left));
-        padding-right: max(12px, env(safe-area-inset-right));
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-
-    .navbar {
-        padding-top: max(12px, env(safe-area-inset-top));
+    .container {
         padding-left: max(16px, env(safe-area-inset-left));
         padding-right: max(16px, env(safe-area-inset-right));
     }
 
-    @media screen and (max-width: 480px) {
+    .navbar {
+        padding-left: max(24px, env(safe-area-inset-left));
+        padding-right: max(24px, env(safe-area-inset-right));
+    }
+
+    @media screen and (max-width: 600px) {
 
         .review-modal,
         .edit-modal,
         .conflict-modal {
-            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            padding-bottom: max(32px, env(safe-area-inset-bottom));
         }
     }
 }
 
 /* =============================================================================
-   REDUCED MOTION (Accessibility)
+   REDUCED MOTION
    ============================================================================= */
 @media (prefers-reduced-motion: reduce) {
 
@@ -322,16 +318,5 @@
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
-    }
-}
-
-/* =============================================================================
-   DARK MODE ADJUSTMENTS (Already dark, but ensure consistency)
-   ============================================================================= */
-@media (prefers-color-scheme: light) {
-
-    /* Keep dark theme regardless of system preference */
-    :root {
-        color-scheme: dark;
     }
 }

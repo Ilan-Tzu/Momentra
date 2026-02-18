@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { formatToLocalTime, toLocalISOString, normalizeToUTC, handleTimeShift, toUTC } from '../utils/dateUtils';
-import '../App.css'; // Reusing existing styles for arrows/inputs
+import { toLocalISOString, normalizeToUTC, handleTimeShift, toUTC } from '../utils/dateUtils';
+import './EditEventModal.css';
 
 const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
     const [form, setForm] = useState({
@@ -14,7 +14,6 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
 
     useEffect(() => {
         if (isOpen && event) {
-            // Initialize form from event logic
             let startTimeIso, endTimeIso, title, description;
 
             if (type === 'task') {
@@ -26,11 +25,10 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
                 // Candidate
                 startTimeIso = normalizeToUTC(event.parameters.start_time);
                 endTimeIso = normalizeToUTC(event.parameters.end_time);
-                title = event.parameters.title || event.description; // Fallback
+                title = event.parameters.title || event.description;
                 description = event.parameters.description || event.description || '';
             }
 
-            // Default to now if missing
             const startDateObj = startTimeIso ? new Date(startTimeIso) : new Date();
             const endDateObj = endTimeIso ? new Date(endTimeIso) : new Date(startDateObj.getTime() + 30 * 60000);
 
@@ -41,7 +39,7 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
                 title,
                 description,
                 start_date: startLocal.split('T')[0],
-                start_time: startLocal.split('T')[1].substring(0, 5), // "HH:MM"
+                start_time: startLocal.split('T')[1].substring(0, 5),
                 end_date: endLocal.split('T')[0],
                 end_time: endLocal.split('T')[1].substring(0, 5)
             });
@@ -54,7 +52,6 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
         setForm(prev => {
             const next = { ...prev, [field]: value };
 
-            // If we are changing start, we shift end to keep duration
             if (field === 'start_time' || field === 'start_date') {
                 const oldStart = new Date(`${prev.start_date}T${prev.start_time}`);
                 const oldEnd = new Date(`${prev.end_date}T${prev.end_time}`);
@@ -80,7 +77,6 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
         setForm(prev => {
             const next = { ...prev, [field]: time, [dateField]: date };
 
-            // Re-apply the duration logic if start changed
             if (isStart) {
                 const oldStart = new Date(`${prev.start_date}T${prev.start_time}`);
                 const oldEnd = new Date(`${prev.end_date}T${prev.end_time}`);
@@ -99,41 +95,28 @@ const EditEventModal = ({ isOpen, onClose, onSave, event, type = 'task' }) => {
     };
 
     const handleSaveClick = () => {
-        // Construct merged ISO strings
         const startIso = `${form.start_date}T${form.start_time}`;
         const endIso = `${form.end_date}T${form.end_time}`;
 
         const startObj = new Date(startIso);
         const endObj = new Date(endIso);
 
-        // Validate valid dates
-        if (isNaN(startObj.getTime())) {
-            alert("Invalid Start Date/Time");
-            return;
-        }
-        if (isNaN(endObj.getTime())) {
-            alert("Invalid End Date/Time");
-            return;
-        }
-
-        // Ensure End > Start
-        if (endObj <= startObj) {
-            alert("End time must be after start time.");
-            return;
-        }
+        if (isNaN(startObj.getTime())) { alert("Invalid Start Date/Time"); return; }
+        if (isNaN(endObj.getTime())) { alert("Invalid End Date/Time"); return; }
+        if (endObj <= startObj) { alert("End time must be after start time."); return; }
 
         onSave({
             ...event,
             title: form.title,
             description: form.description,
-            start_time: startIso, // Local ISO "YYYY-MM-DDTHH:MM"
-            end_time: endIso      // Local ISO
+            start_time: startIso,
+            end_time: endIso
         });
     };
 
     return (
-        <div className="edit-event-overlay">
-            <div className="edit-event-modal">
+        <div className="edit-event-overlay" onClick={onClose}>
+            <div className="edit-event-modal" onClick={e => e.stopPropagation()}>
                 <div className="edit-event-header">
                     <h2>Edit {type === 'task' ? 'Event' : 'Candidate'}</h2>
                     <button onClick={onClose} className="close-btn">✕</button>

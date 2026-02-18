@@ -3,7 +3,7 @@ from .models import Job, JobCandidate, Task, JobStatus, User
 from .schemas import JobCreate, JobCandidateRead, JobCandidateUpdate, TaskUpdate
 from .config import settings
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 # =============================================================================
@@ -217,10 +217,22 @@ class JobService:
                 # 1. Check for conflicts with existing tasks (Database)
                 conflict_found = self._find_conflict(job.user_id, new_start, new_end)
                 
+                # 2. Check for conflicts with previously processed candidates in this same job
+                if not conflict_found:
+                    for prev in provisionally_accepted:
+                        if prev['is_blocking'] and self._times_overlap(new_start, new_end, prev['start'], prev['end']):
+                            conflict_found = prev['cand_obj']
+                            break
+
                 # Check exclusion criteria (background events etc)
                 is_conflict_bg = False
-                if conflict_found and hasattr(conflict_found, 'is_blocking'):
-                    is_conflict_bg = not conflict_found.is_blocking
+                if conflict_found:
+                    if hasattr(conflict_found, 'is_blocking'):
+                        is_conflict_bg = not conflict_found.is_blocking
+                    else:
+                        # It's a JobCandidate, check its description for background keywords
+                        conflict_title = getattr(conflict_found, 'description', '')
+                        is_conflict_bg = self._is_background_event(conflict_title)
                 
                 if conflict_found and not (is_background_cand or is_conflict_bg):
                      should_raise_conflict = True
@@ -301,62 +313,23 @@ class JobService:
             candidates.append(candidate)
             
         # Process Ambiguities (from LLM)
-        # Process Ambiguities (from LLM)
         for amb in result.get("ambiguities", []):
-            # NEW: Check if this "ambiguity" is actually a valid task that LLM flagged as conflict
-            # If it has options with valid JSON values containing start_time, pick the first option as the default task
-            converted_to_task = False
-            
-            # Check if this "ambiguity" (regardless of type) has a recoverable option with time
-            if amb.get("options"):
-                 for opt in amb.get("options", []):
-                     # Trust any option that has a JSON value with a start_time
-                     try:
-                         val = json.loads(opt["value"])
-                         if "start_time" in val and val.get("title"):
-                             # It has a time! Create as task instead.
-                             new_start = self._parse_datetime(val.get("start_time"))
-                             new_end = self._parse_datetime(val.get("end_time"))
-                             # Double check conflicts against DB ONLY (not batch)
-                             conflict = self._find_conflict(job.user_id, new_start, new_end)
-                             
-                             if not conflict:
-                                 # No DB conflict? Then it's a valid task.
-                                 candidate = JobCandidate(
-                                     job_id=job.id,
-                                     description=val.get("title", "Recovered Task"),
-                                     command_type="CREATE_TASK",
-                                     parameters={
-                                         "title": val.get("title"),
-                                         "start_time": val.get("start_time"),
-                                         "end_time": val.get("end_time"),
-                                         "description": amb.get("message")
-                                     },
-                                     confidence=0.8
-                                 )
-                                 self.db.add(candidate)
-                                 candidates.append(candidate)
-                                 converted_to_task = True
-                                 break 
-                     except: pass
-            
-            if not converted_to_task:
-                candidate = JobCandidate(
-                    job_id=job.id,
-                    description=amb.get("title") or f"Ambiguity: {amb.get('message')}",
-                    command_type="AMBIGUITY",
-                    parameters={
-                        "type": amb.get("type"), 
-                        "message": amb.get("message"),
-                        "options": [
-                            {"label": opt.get("label"), "value": opt.get("value")} 
-                            for opt in amb.get("options", [])
-                        ]
-                    },
-                    confidence=0.0
-                )
-                self.db.add(candidate)
-                candidates.append(candidate)
+            candidate = JobCandidate(
+                job_id=job.id,
+                description=amb.get("title") or f"Ambiguity: {amb.get('message')}",
+                command_type="AMBIGUITY",
+                parameters={
+                    "type": amb.get("type"), 
+                    "message": amb.get("message"),
+                    "options": [
+                        {"label": opt.get("label"), "value": opt.get("value")} 
+                        for opt in amb.get("options", [])
+                    ]
+                },
+                confidence=0.0
+            )
+            self.db.add(candidate)
+            candidates.append(candidate)
         
         job.status = JobStatus.PARSED
         self.db.commit()
@@ -401,6 +374,21 @@ class JobService:
                     return existing
         return None
 
+    def _round_to_boundary(self, dt: datetime, interval_min: int = 15) -> datetime:
+        """Round to nearest interval boundary for cleaner suggestions."""
+        total_min = dt.hour * 60 + dt.minute
+        rem = total_min % interval_min
+        if rem == 0:
+            return dt.replace(second=0, microsecond=0)
+        
+        # Always round forward unless very close to previous
+        if rem < 5: 
+             rounded = total_min - rem
+        else:
+             rounded = total_min + (interval_min - rem)
+             
+        return dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=rounded)
+
     def _find_nearest_available_slot(
         self, 
         user_id: int, 
@@ -411,112 +399,95 @@ class JobService:
         work_start_hour: int = 8,
         work_end_hour: int = 22
     ) -> Optional[dict]:
-        """
-        Find the nearest available time slot for an event that conflicts.
-        
-        Args:
-            user_id: The user's ID
-            conflict_start: The start time of the conflict
-            event_duration_minutes: How long the event needs to be
-            buffer_minutes: Minimum gap between events (default 15)
-            provisionally_accepted: List of pending candidates to also avoid
-            work_start_hour: Start of working day (0-23)
-            work_end_hour: End of working day (0-23)
-            
-        Returns:
-            {"start_time": "ISO string", "end_time": "ISO string"} or None
-        """
         from datetime import timedelta
         
         if not conflict_start:
             return None
             
-        # Get all blocking tasks for the day, sorted by start time
         day_start = conflict_start.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
         
+        # Busy slots (Blocking Tasks)
         existing_tasks = self.db.query(Task).filter(
             Task.user_id == user_id,
             Task.is_blocking == True,
             Task.start_time >= day_start,
             Task.start_time < day_end
-        ).order_by(Task.start_time.asc()).all()
+        ).all()
         
-        # Build list of all busy slots (existing + provisional)
         busy_slots = []
         for task in existing_tasks:
             if task.start_time:
                 end = task.end_time or (task.start_time + timedelta(minutes=30))
                 busy_slots.append((task.start_time, end))
         
-        # Add provisional candidates
         if provisionally_accepted:
              for prev in provisionally_accepted:
                 if prev.get('is_blocking') and prev.get('start') and prev.get('end'):
                     busy_slots.append((prev['start'], prev['end']))
         
-        # Sort by start time
         busy_slots.sort(key=lambda x: x[0])
         
-        needed_duration = timedelta(minutes=event_duration_minutes + buffer_minutes)
+        # Merge overlaps in busy_slots
+        if not busy_slots:
+            merged = []
+        else:
+            merged = [busy_slots[0]]
+            for current in busy_slots[1:]:
+                prev_start, prev_end = merged[-1]
+                if current[0] < prev_end:
+                    merged[-1] = (prev_start, max(prev_end, current[1]))
+                else:
+                    merged.append(current)
         
-        # Define working hours using preferences
+        # Candidate search points
+        search_points = set()
+        search_points.add(self._round_to_boundary(conflict_start))
+        search_points.add(self._round_to_boundary(conflict_start + timedelta(minutes=15)))
+        
+        for _, end in merged:
+            search_points.add(self._round_to_boundary(end + timedelta(minutes=buffer_minutes)))
+        
         work_start = conflict_start.replace(hour=work_start_hour, minute=0, second=0, microsecond=0)
         work_end = conflict_start.replace(hour=work_end_hour, minute=0, second=0, microsecond=0)
-        
-        # Handle cases where work_end is midnight or next day (e.g. 2am end)
-        if work_end_hour < work_start_hour:
-             work_end = work_end + timedelta(days=1)
+        if work_end_hour < work_start_hour: work_end += timedelta(days=1)
+        search_points.add(work_start)
 
-        # Strategy: Find gaps and check if event fits
-        # Check slot immediately AFTER the conflicting event first (most intuitive)
-        
-        potential_slots = []
-        
-        # Check gaps between busy slots
-        if not busy_slots:
-            # No events, suggest right after work start or after conflict
-            suggest_start = max(work_start, conflict_start + timedelta(minutes=buffer_minutes))
-            if suggest_start + needed_duration <= work_end:
-                return {
-                    "start_time": (suggest_start + timedelta(minutes=buffer_minutes)).isoformat() + "Z",
-                    "end_time": (suggest_start + timedelta(minutes=buffer_minutes + event_duration_minutes)).isoformat() + "Z"
-                }
-            return None
-        
-        # Check before first event
-        if busy_slots[0][0] > work_start:
-            gap_start = work_start
-            gap_end = busy_slots[0][0] - timedelta(minutes=buffer_minutes)
-            if gap_end - gap_start >= timedelta(minutes=event_duration_minutes):
-                potential_slots.append(gap_start)
-        
-        # Check gaps between events
-        for i in range(len(busy_slots) - 1):
-            gap_start = max(busy_slots[i][1] + timedelta(minutes=buffer_minutes), work_start)
-            gap_end = busy_slots[i + 1][0] - timedelta(minutes=buffer_minutes)
+        valid_suggestions = []
+        duration = timedelta(minutes=event_duration_minutes)
+        buffer = timedelta(minutes=buffer_minutes)
+
+        for start_c in search_points:
+            if start_c < day_start or start_c + duration > day_end:
+                continue
+                
+            end_c = start_c + duration
+            has_conflict = False
+            for b_start, b_end in merged:
+                if self._times_overlap(start_c, end_c, b_start - buffer, b_end + buffer):
+                    has_conflict = True
+                    break
             
-            if gap_end - gap_start >= timedelta(minutes=event_duration_minutes):
-                potential_slots.append(gap_start)
-        
-        # Check after last event
-        last_end = max(busy_slots[-1][1] + timedelta(minutes=buffer_minutes), work_start)
-        if last_end + timedelta(minutes=event_duration_minutes) <= work_end:
-            potential_slots.append(last_end)
-        
-        # Find the slot closest to conflict_start
-        if not potential_slots:
+            if not has_conflict:
+                valid_suggestions.append(start_c)
+
+        if not valid_suggestions:
             return None
             
-        # Sort by distance from conflict
-        potential_slots.sort(key=lambda s: abs((s - conflict_start).total_seconds()))
-        
-        best_start = potential_slots[0]
-        best_end = best_start + timedelta(minutes=event_duration_minutes)
+        def score_slot(s):
+            diff = (s - conflict_start).total_seconds() / 60
+            dist = abs(diff)
+            penalty = 0
+            if diff < 0: penalty += 500
+            if s < work_start or s + duration > work_end: penalty += 200
+            return dist + penalty
+            
+        valid_suggestions.sort(key=score_slot)
+        best_start = valid_suggestions[0]
         
         return {
             "start_time": best_start.isoformat() + "Z",
-            "end_time": best_end.isoformat() + "Z"
+            "end_time": (best_start + duration).isoformat() + "Z"
         }
 
     def _format_conflict_parameters(self, title, start_time, end_time, conflict_obj, user_id: int = None, provisionally_accepted: list = None):
@@ -575,10 +546,16 @@ class JobService:
         # Calculate event duration for smart suggestion
         new_start_dt = self._parse_datetime(start_time)
         new_end_dt = self._parse_datetime(end_time)
+        
         if new_start_dt and new_end_dt:
             event_duration = int((new_end_dt - new_start_dt).total_seconds() / 60)
         else:
             event_duration = default_dur  # Use preference
+            
+        # Ensure end_time is set if missing, using calculated duration
+        if new_start_dt and not new_end_dt:
+            new_end_dt = new_start_dt + timedelta(minutes=event_duration)
+            end_time = new_end_dt.isoformat() + "Z"
 
         # Build options list
         options = []
@@ -596,7 +573,6 @@ class JobService:
             )
             
             if suggested_slot:
-                # Frontend will convert ISO to local time for display
                 options.append({
                     "label": "Suggested time", 
                     "value": json.dumps({
@@ -607,10 +583,10 @@ class JobService:
                     }),
                     "suggested": True,
                     "display_time": suggested_slot["start_time"],
-                    "end_time": suggested_slot["end_time"] # Pass end time for frontend rendering
+                    "end_time": suggested_slot["end_time"]
                 })
 
-        # Standard options
+        # Standard options (Now using guaranteed end_time)
         options.extend([
             {"label": f"Keep '{title}' (replace)", "value": json.dumps({
                 "title": title,
@@ -680,6 +656,13 @@ class JobService:
                 continue
                 
             end_time = self._parse_datetime(params.get("end_time"))
+            
+            # Ensure end_time exists; fallback to preference if missing
+            if not end_time:
+                prefs = self._get_preferences(user_id)
+                default_dur = getattr(prefs, 'default_duration_minutes', 60) if not isinstance(prefs, dict) else prefs.get('default_duration_minutes', 60)
+                end_time = start_time + timedelta(minutes=default_dur)
+                
             task_title = params.get("title", cand.description)
 
             # --- CONFLICT CHECK ---
@@ -873,15 +856,38 @@ class JobService:
                     job = self.db.query(Job).filter(Job.id == candidate.job_id).first()
                     if job:
                         conflict_found = self._find_conflict(job.user_id, new_start, new_end)
+                        
+                        # Also check other candidates for the same job
+                        if not conflict_found:
+                            other_cands = self.db.query(JobCandidate).filter(
+                                JobCandidate.job_id == candidate.job_id,
+                                JobCandidate.id != candidate.id,
+                                JobCandidate.command_type == "CREATE_TASK"
+                            ).all()
+                            for oc in other_cands:
+                                oc_params = oc.parameters
+                                if isinstance(oc_params, str):
+                                    try: oc_params = json.loads(oc_params)
+                                    except: continue
+                                oc_start = self._parse_datetime(oc_params.get('start_time'))
+                                if oc_start:
+                                    oc_end = self._parse_datetime(oc_params.get('end_time'))
+                                    if not oc_end:
+                                        oc_end = oc_start + timedelta(minutes=60)
+                                    if self._times_overlap(new_start, new_end, oc_start, oc_end):
+                                        conflict_found = oc
+                                        break
+
                         if conflict_found:
-                            print(f"DEBUG update_candidate: Found conflict with '{conflict_found.title}', transforming back to AMBIGUITY")
+                            print(f"DEBUG update_candidate: Found conflict, transforming back to AMBIGUITY")
                             candidate.command_type = "AMBIGUITY"
                             candidate.description = f"Conflict: {candidate.parameters.get('title', 'New Task')}"
                             candidate.parameters = self._format_conflict_parameters(
                                 candidate.parameters.get("title", "New Task"),
                                 start_time_str,
                                 end_time_str,
-                                conflict_found
+                                conflict_found,
+                                user_id=job.user_id
                             )
                         else:
                             print("DEBUG update_candidate: No conflict found, staying CREATE_TASK")
@@ -901,8 +907,26 @@ class JobService:
         self.db.delete(candidate)
         self.db.commit()
 
+    def cleanup_old_tasks(self, user_id: int):
+        """Delete tasks older than 3 days to match frontend view window."""
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=3)
+            deleted = self.db.query(Task).filter(
+                Task.user_id == user_id,
+                Task.start_time < cutoff
+            ).delete(synchronize_session=False)
+            if deleted > 0:
+                self.db.commit()
+                print(f"DEBUG: Cleaned up {deleted} old tasks for user {user_id}")
+        except Exception as e:
+            self.db.rollback()
+            print(f"ERROR cleanup_old_tasks: {e}")
+
     def get_tasks(self, start: Optional[datetime], end: Optional[datetime], user_id: int) -> List[Task]:
         """Fetch tasks for a user within an optional time range."""
+        # Periodic cleanup triggered on fetch
+        self.cleanup_old_tasks(user_id)
+        
         query = self.db.query(Task).filter(Task.user_id == user_id)
         
         if start:
@@ -946,11 +970,26 @@ class JobService:
                 if existing.start_time and new_start:
                     if self._times_overlap(new_start, new_end, existing.start_time, existing.end_time):
                         # Found a conflict!
+                        # Found a conflict!
+                        # Calculate available slot suggestion
+                        suggestion = None
+                        if new_start and new_end:
+                            duration = int((new_end - new_start).total_seconds() / 60)
+                            # Get preferences for buffers if possible (defaulting here for now as in _format_conflict_parameters)
+                            # You can fetch proper prefs if needed, but defaults are safe
+                            suggestion = self._find_nearest_available_slot(
+                                user_id=task.user_id,
+                                conflict_start=new_start,
+                                event_duration_minutes=duration,
+                                buffer_minutes=15 # Default buffer
+                            )
+
                         conflict_info = {
                             "id": existing.id,
                             "title": existing.title,
                             "start_time": existing.start_time.isoformat() if existing.start_time else None,
-                            "end_time": existing.end_time.isoformat() if existing.end_time else None
+                            "end_time": existing.end_time.isoformat() if existing.end_time else None,
+                            "suggestion": suggestion
                         }
                         raise ValueError(f"CONFLICT:{json.dumps(conflict_info)}")
 

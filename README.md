@@ -33,7 +33,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - **Glassmorphism design**: Modern, elegant UI with blur effects and gradients
 - **Dual-Mode UI**: Seamlessly switch between focus-driven Modal views and comprehensive Full-Page dashboards
 - **Smooth interactions**: Animated calendar strip with auto-centering on selected dates
-- **Modular Themes**: Specialized skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), and Review (Purple Glass) modes
+- **Modular Themes**: Specialized skins for Edit (Cyber-Industrial), Conflict (Amber/Warning), Review (Purple Glass), and **Templates (Vibrant Orange/Amber)**
 - **Google Sign-In**: Seamless authentication with OAuth 2.0
 
 ---
@@ -43,6 +43,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 ### Frontend
 - **Framework**: React 18 + Vite
 - **Styling**: Custom CSS with glassmorphism design system
+- **Icons**: Lucide React
 - **State Management**: React hooks
 - **HTTP Client**: Axios
 - **Auth**: @react-oauth/google
@@ -61,7 +62,7 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - Timezone-aware parsing
   - Ambiguity detection
   - Conflict-free scheduling recommendations
-  - Stay ambiguity detection for accommodations (Airbnb/Hotels)
+  - **Lodging Intelligence**: Specialized defaults for Airbnb/Hotels (15:00 Check-in, 11:00 Check-out)
   - Natural language understanding for relative dates ("tomorrow", "next Friday")
 
 ---
@@ -77,20 +78,28 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
   - [x] **Scheduling**: Custom buffer times, work hours, and default durations
   - [x] **AI Behavior**: Adjustable temperature and free-form personal context
   - [x] **Display**: 24h/12h time format and First Day of Week settings
-  - [x] **Persistence**: Synced across sessions via dedicated backend storage
 - [x] **Intelligent Conflict Resolution**
   - [x] **Smart Suggested Slots**: Automatically finds the nearest free gap respecting buffer and work hours
   - [x] **Amber-Gold Conflict UI**: Vertical task stack for clear comparison
   - [x] "Save Anyway" override with pulse animation
+- **[x] Stock Templates Library**
+  - [x] **Vibrant Orange Theme**: Distinct visual identity for templated scheduling
+  - [x] **6 Pro-Grade Templates**: Productive Morning, Fitness Day, Meal Prep, Wind-down, Focus Block, Errand Runner.
+  - [x] **One-Click Implementation**: Seamlessly populates the prompt field from templates
 - **[x] Multi-Day Task Visualization**
   - [x] **Proportional Bars**: Bar length and position now reflect exact hours
   - [x] **Vertical Connectors**: Task list shows "Start", "Continued", and "End" segments with visual links
+  - [x] **Review Context**: Date ranges (e.g., Nov 12 - 14) displayed during confirmation
 - [x] **Non-Blocking Task Support**
   - [x] Logistical Bypass: "Airbnb", "Stay", and "Hotel" events are non-blocking
   - [x] Rigid Enforcement: "Flights" and "Appointments" remain blocking
 - [x] **Stay Ambiguity Handling**
   - [x] Automatic detection of accommodation keywords
   - [x] "Educated Guess" options (Check-in 3pm / Check-out 11am)
+  - [x] **Lodging Defaults**: Automatic 15:00/11:00 times for Airbnb/Hotels
+- [x] **Enhanced Event Review**
+  - [x] **Standardized Action UI**: 14px rounded buttons with semantic icons (Accept, Reject, Edit)
+  - [x] **Clean Multi-Day Logic**: Range-based display for events spanning multiple days
 - [x] **Unified Event Editing**
   - [x] Cyber-Industrial Theme Modal
   - [x] Auto-Follow Logic: Portal jumps to the new date after rescheduling
@@ -104,104 +113,48 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 - [x] **Admin Dashboard (SQLAdmin)**
   - [x] Live analytics overview (Cards + Usage Graphs)
   - [x] Deep inspection of Users, Tasks, AI Jobs, and Token Logs
-  - [x] Safe, read-only monitoring interface
 - [x] **Security & Performance**
   - [x] Rate limiting & LLM/Transcription caching
   - [x] JWT with auto-background token refresh
   - [x] Input sanitization with `bleach`
 
-### 🔧 Core Components
-- **LoginPage**: Google OAuth with floating calendar animations
-- **Navbar**: App navigation and logout
-- **CalendarStrip**: Horizontal date selector with multi-lane task indicators
-- **PreferencesPage**: Tabbed settings (Scheduling, AI, Display) with debounced auto-save
-- **ConflictModal**: High-gravity visual conflict resolution interface
-- **PreviewModal**: LLM-generated task review before acceptance
-- **AdminDashboard**: SQLAdmin-powered monitoring suite with Chart.js analytics
-
----
-
-## 📋 Next Steps (Roadmap to MVP)
-
-### High Priority
-1. **Template Data Structure (The "Molecule")**
-   - Specialized schema for modular schedule blocks
-   - Support for complex logic within templates (offsets, relative dependencies)
-
-2. **Calendar Integration (Sync Pipeline)**
-   - Google Calendar sync (two-way)
-   - webcal export/import
-
-### Medium Priority
-2. **Recurring Tasks**
-   - Daily/weekly/monthly patterns
-   - Custom recurrence rules
-   - Smart handling of conflicts
-
-4. **Notifications & Reminders**
-   - Email notifications
-   - Browser push notifications
-   - Customizable reminder times
-
-3. **Templates**
-   - Create templates for recurring patterns (Gym Day, Work Day, etc.)
-   - Mass removal/insertion of template-driven events
-
-### Lower Priority
-7. **Search & Filter**
-    - Full-text task search
-    - Date range filtering
-    - Tag-based organization
-
-8. **Analytics Dashboard**
-    - Time tracking & productivity insights
-
-8. **Collaboration**
-    - Shared calendars & Team scheduling
-
-
 ---
 
 ## 🏁 Distance from Production
 
-### Current Status: **Alpha (85% Production-Ready)**
+### Current Status: **Alpha (90% Production-Ready)**
 
 #### What's Production-Ready ✅
 - Core scheduling & AI parsing logic
 - Complex conflict detection & smart fix engine
-- User preference system (Scheduling + AI Context)
+- User preference system & Stock Templates
 - Google OAuth & JWT refresh mechanism
 - PWA & Mobile support
-- Testing suite (AI, API, UI)
-- Security Hardening
+- Testing suite & Security Hardening
+- Token tracking & Costs
 
 #### Critical Gaps 🚧
-- **Infrastructure** (6/10)
-  - No deployment configuration (Docker/K8s) ❌
-  - No CI/CD pipeline ❌
-  - **Monitoring & Stats API** ✅ (Token logs & Admin Dashboard implemented)
-
-- **Reliability** (6/10)
-  - No automated backup system ❌
-  - Basic data validation (needs more rigid constraints) ⚠️
+- **Infrastructure** (7/10)
+  - Deployment configuration (Docker) in progress ❌
+  - CI/CD pipeline ❌
 
 - **Testing** (8/10)
-  - Integration tests ❌
-  - Coverage needs expanding for edge case conflict chains ⚠️
+  - Integration tests for edge case conflict chains ⚠️
 
-- **Documentation** (3/10)
+- **Documentation** (5/10)
   - API Documentation (Swagger) ✅
   - Technical architecture notes ✅
   - No end-user manual ❌
 
-#### Estimated Timeline to MVP
-- **2-3 weeks** for basic production deployment
-  - Week 1: Infrastructure as Code, CI/CD setup
-  - Week 2: Reliability hardening & monitoring
-  - Week 3: Bug fixes, polish, documentation
+---
 
-- **4-6 weeks** for feature-complete MVP
-  - Includes recurrence, notifications, calendar sync
+## 📊 Current Metrics
+
+- **Lines of Code**: ~15,800
+- **API Endpoints**: 22
+- **AI Token Usage**: ~300-600 tokens per task creation
+- **Supported Features**: 45+ core features
+- **Database Tables**: 6 (Users, Jobs, JobCandidates, Tasks, UserPreferences, TokenLogs)
 
 ---
 
@@ -226,7 +179,10 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate  
+# On Windows:
+# .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your API keys
@@ -248,48 +204,6 @@ npm run dev
 
 ---
 
-## 🔐 Configuration & Secrets Management
-
-Momentra uses a multi-layered configuration strategy to ensure security and ease of deployment.
-
-### 1. Configuration Hierarchy (Backend)
-The backend uses `Pydantic Settings` which follows this order of priority:
-1. **Environment Variables**: Set directly on the host (Highest priority, recommended for Production).
-2. **.env File**: Local file (Only loaded in `development` mode).
-3. **Defaults**: Hardcoded values in `app/config.py`.
-
-### 2. Environment Setup
-To set up your environment:
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Copy `frontend/.env.example` to `frontend/.env`.
-3. Add your sensitive keys (`OPENAI_API_KEY`, etc.) to the `.env` files.
-4. **DO NOT commit `.env` files.** The root `.gitignore` is configured to protect them.
-
-### 🔑 Required API Keys
-```bash
-# Backend
-OPENAI_API_KEY=sk-proj-...
-DATABASE_URL=postgresql://...
-GOOGLE_CLIENT_ID=...
-JWT_SECRET_KEY=... # 32+ character random string
-
-# Frontend
-VITE_API_BASE_URL=https://api.yourdomain.com/v1
-VITE_GOOGLE_CLIENT_ID=...
-```
-
----
-
-## 📊 Current Metrics
-
-- **Lines of Code**: ~14,200
-- **API Endpoints**: 20
-- **AI Token Usage**: ~300-600 tokens per task creation (context-enriched)
-- **Supported Features**: 35+ core features
-- **Database Tables**: 6 (Users, Jobs, JobCandidates, Tasks, UserPreferences, TokenLogs)
-
----
-
 ## 🎯 Vision
 
 Momentra aims to be the **Siri of calendars**—an AI assistant that understands the nuances of time, respects your personal lifestyle, and handles scheduling complexity so you can focus on what matters.
@@ -302,5 +216,5 @@ Private - All Rights Reserved
 
 ---
 
-**Last Updated**: January 21, 2026  
-**Version**: 0.9.1-alpha
+**Last Updated**: February 18, 2026  
+**Version**: 0.9.5-alpha

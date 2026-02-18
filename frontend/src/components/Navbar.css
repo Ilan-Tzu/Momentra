@@ -20,11 +20,13 @@
     font-weight: 600;
     color: white;
     letter-spacing: -0.02em;
+    z-index: 5002;
 }
 
 .navbar-links {
     display: flex;
     gap: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-link {
@@ -72,27 +74,88 @@
     color: #FECACA;
 }
 
-.navbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.nav-icon-btn {
+.hamburger {
+    display: none;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.6);
-    padding: 8px;
-    border-radius: 10px;
+    border: none;
+    color: white;
     cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 8px;
+    z-index: 5002;
+    border-radius: 8px;
+    transition: background 0.2s;
 }
 
-.nav-icon-btn:hover {
-    background: rgba(139, 92, 246, 0.15);
-    border-color: rgba(139, 92, 246, 0.3);
-    color: white;
+.hamburger:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mobile-only {
+    display: none !important;
+}
+
+/* Responsive Styles */
+@media (max-width: 600px) {
+    .hamburger {
+        display: block;
+    }
+
+    .desktop-only {
+        display: none !important;
+    }
+
+    .mobile-only {
+        display: flex !important;
+    }
+
+    .navbar-links {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
+        height: 100dvh;
+        /* Use dynamic viewport height */
+        background: rgba(10, 5, 20, 0.98);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        /* Start from top to prevent vertical overflow issues */
+        padding-top: 100px;
+        /* Space for the brand/close button */
+        gap: 20px;
+        z-index: 5001;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(100%);
+        /* Slide in from right instead of vertical jump */
+        overflow-y: auto;
+    }
+
+    .navbar-links.open {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+    }
+
+    .nav-link {
+        font-size: 22px;
+        font-weight: 600;
+        padding: 16px 32px;
+        width: 85%;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .navbar-links .nav-logout {
+        margin-top: 10px;
+        font-size: 18px;
+        padding: 14px 24px;
+        width: 85%;
+        justify-content: center;
+    }
 }

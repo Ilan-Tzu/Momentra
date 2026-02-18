@@ -5,16 +5,15 @@
     overflow-y: hidden;
     padding: 12px 4px;
     scroll-behavior: smooth;
-    /* Restore Custom Scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.3) rgba(255, 255, 255, 0.05);
+    /* Hide scrollbar but keep functionality */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
     max-width: 100%;
 }
 
 /* Custom Scrollbar for Webkit */
 .calendar-strip::-webkit-scrollbar {
-    height: 6px;
-    display: block;
+    display: none;
 }
 
 .calendar-strip::-webkit-scrollbar-track {

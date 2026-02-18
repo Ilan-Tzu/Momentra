@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { jobService } from './services/api'
+import { Trash2, Edit3, Check, X } from 'lucide-react'
 import CalendarStrip from './components/CalendarStrip'
 import ConfirmModal from './components/ConfirmModal'
 import Navbar from './components/Navbar'
 import LoginPage from './components/LoginPage'
 import EditEventModal from './components/EditEventModal'
 import PreferencesPage from './components/PreferencesPage'
+import TemplatesPage from './components/TemplatesPage'
 import './App.css'
 import './mobile.css'
 
-import { formatToLocalTime, toLocalISOString, toUTC, normalizeToUTC, handleTimeShift } from './utils/dateUtils'
+import { formatToLocalTime, toLocalISOString, toUTC, normalizeToUTC, handleTimeShift, formatToLocalDate } from './utils/dateUtils'
 import { getUser, clearTokens } from './utils/auth'
 
 function App() {
@@ -18,6 +20,7 @@ function App() {
   const [jobId, setJobId] = useState(null)
   const [candidates, setCandidates] = useState([]) // For preview
   const [errorMsg, setErrorMsg] = useState('')
+  const [tasksAddedInCurrentSession, setTasksAddedInCurrentSession] = useState(false);
 
   // User state
   const [user, setUser] = useState(getUser()?.username || '');
@@ -76,6 +79,8 @@ function App() {
   });
 
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
+  const scheduleRef = useRef(null);
+  const inputRef = useRef(null);
 
   const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
@@ -136,12 +141,30 @@ function App() {
       fetchPreferences();
     }
   }, [user])
+  const handleSelectDate = (date) => {
+    setSelectedDate(date);
+    // Removed auto-scroll here as it conflicts with 'only scroll if added' logic
+  };
 
   useEffect(() => {
     if (status === 'preview' && candidates.length === 0) {
-      reset();
+      // Pass the session state to reset so it knows whether to scroll based on earlier additions
+      reset(tasksAddedInCurrentSession);
     }
-  }, [candidates, status])
+  }, [candidates, status, tasksAddedInCurrentSession])
+
+  const isFirstMount = useRef(true);
+
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    // Only scroll automatically if we AREN'T in the middle of a review/loading
+    if (scheduleRef.current && activePage === 'create' && status === 'input') {
+      scheduleRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedDate]);
 
   // Prevent background scroll when modal is open
   useEffect(() => {
@@ -158,13 +181,37 @@ function App() {
   }, [status])
 
 
-  const reset = () => {
+  const reset = (shouldScroll = false) => {
     setRawText('');
     setCandidates([]);
     setJobId(null);
     setStatus('input');
     setErrorMsg('');
+    setTasksAddedInCurrentSession(false);
+
+    if (shouldScroll && scheduleRef.current) {
+      setTimeout(() => {
+        scheduleRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   }
+
+  const handleCloseReview = () => {
+    if (candidates.length > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Discard Events?',
+        message: `You have ${candidates.length} event${candidates.length === 1 ? '' : 's'} remaining to review. Closing will discard them. Are you sure?`,
+        isDestructive: true,
+        onConfirm: () => {
+          reset(tasksAddedInCurrentSession);
+          closeConfirm();
+        }
+      });
+    } else {
+      reset(tasksAddedInCurrentSession);
+    }
+  };
 
   const handleLogout = () => {
     clearTokens();
@@ -172,17 +219,26 @@ function App() {
     setCalendarTasks([]);
   }
 
+  const handleSelectTemplate = (text) => {
+    setRawText(text);
+    setActivePage('create');
+  }
+
   const fetchCalendarTasks = async () => {
     try {
+      // Fetch from 7 days ago to 60 days in future to ensure we don't have "ghost" events
+      // that exist in the DB but are just outside our window.
       const start = new Date();
-      start.setDate(start.getDate() - 2);
+      start.setDate(start.getDate() - 7);
+      start.setHours(0, 0, 0, 0);
+
       const end = new Date();
-      end.setDate(end.getDate() + 30);
-      console.log(`Fetching tasks from ${start.toISOString()} to ${end.toISOString()}`);
+      end.setDate(end.getDate() + 60);
+      end.setHours(23, 59, 59, 999);
 
       const tasks = await jobService.getTasks(start.toISOString(), end.toISOString());
-      console.log("Fetched calendar tasks:", tasks.length, tasks);
-      // Normalize times from backend (UTC naive -> UTC Z)
+      console.log("Fetched calendar tasks:", tasks.length);
+
       const normalized = tasks.map(t => ({
         ...t,
         start_time: normalizeToUTC(t.start_time),
@@ -242,12 +298,13 @@ function App() {
     if (!rawText.trim()) return;
     setStatus('loading');
     setErrorMsg('');
+    setTasksAddedInCurrentSession(false);
 
     try {
       const job = await jobService.createJob(rawText);
       setJobId(job.id);
       await jobService.parseJob(job.id);
-      await refreshPreview(job.id);
+      await refreshPreview(job.id, true);
     } catch (err) {
       console.error(err);
       setErrorMsg('Failed to process request. Please try again.');
@@ -255,7 +312,7 @@ function App() {
     }
   }
 
-  const refreshPreview = async (id) => {
+  const refreshPreview = async (id, isInitial = false) => {
     const preview = await jobService.getJob(id);
 
     // Normalize Candidates: Treat Naive LLM output as LOCAL -> Convert to UTC
@@ -268,19 +325,33 @@ function App() {
       return { ...c, parameters: p };
     });
 
+    if (normalizedCandidates.length === 0) {
+      if (isInitial) {
+        setErrorMsg("I couldn't identify any specific scheduling intent in that message. Try being a bit more specific about the task and time!");
+        // Auto-clear after 5 seconds
+        setTimeout(() => setErrorMsg(prev => prev.includes('intent') ? '' : prev), 5000);
+      }
+      setStatus('input');
+      return;
+    }
+
     setCandidates(normalizedCandidates);
     setStatus('preview');
   }
 
-  const finalizeAcceptance = async (candidateId, force = false) => {
+  const finalizeAcceptance = async (candidateIds, force = false) => {
     try {
+      const ids = Array.isArray(candidateIds) ? candidateIds : [candidateIds];
       const res = await jobService.acceptJob(jobId, {
-        selected_candidate_ids: [candidateId],
+        selected_candidate_ids: ids,
         ignore_conflicts: force
       });
 
+      if (res.tasks_created?.length > 0) {
+        setTasksAddedInCurrentSession(true);
+      }
+
       // Use server-provided remaining candidates (which may have been converted to conflicts)
-      // Normalize them just like in refreshPreview
       if (res.remaining_candidates) {
         const normalized = res.remaining_candidates.map(c => {
           const p = { ...c.parameters };
@@ -292,17 +363,18 @@ function App() {
         setCandidates(normalized);
 
         if (normalized.length === 0) {
-          reset();
+          reset(tasksAddedInCurrentSession || res.tasks_created?.length > 0);
         }
       } else {
-        // Fallback if field missing (shouldn't happen with updated backend)
-        const remainingCandidates = candidates.filter(c => c.id !== candidateId);
+        // Fallback if field missing
+        const remainingCandidates = candidates.filter(c => !ids.includes(c.id));
         setCandidates(remainingCandidates);
-        if (remainingCandidates.length === 0) reset();
+        if (remainingCandidates.length === 0) {
+          reset(tasksAddedInCurrentSession || res.tasks_created?.length > 0);
+        }
       }
 
       await fetchCalendarTasks();
-
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (e) {
@@ -317,7 +389,10 @@ function App() {
     setStatus('loading');
     try {
       const allIds = candidates.map(c => c.id);
-      await jobService.acceptJob(jobId, allIds);
+      const res = await jobService.acceptJob(jobId, allIds);
+      if (res.tasks_created?.length > 0) {
+        setTasksAddedInCurrentSession(true);
+      }
       await fetchCalendarTasks();
 
       // Check if job still has remaining candidates (partial success/conflicts)
@@ -327,8 +402,9 @@ function App() {
         await refreshPreview(jobId);
         setErrorMsg('Some events conflicted. Please resolve them below.');
       } else {
-        // Complete success
-        reset();
+        // Complete success - reset with true if actually tasks were added
+        const wasAdded = (res.tasks_created?.length > 0) || tasksAddedInCurrentSession;
+        reset(wasAdded);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       }
@@ -431,7 +507,8 @@ function App() {
           newTaskTime: formatToLocalTime(normalizeToUTC(toUTC(updatedEvent.start_time))),
           existingTaskTime: formatToLocalTime(existingStart),
           newTaskDate: updatedEvent.start_time.split('T')[0],
-          existingTaskDate: existingStart?.split('T')[0] || ''
+          existingTaskDate: existingStart?.split('T')[0] || '',
+          suggestion: conflict?.suggestion
         });
       }
     }
@@ -459,24 +536,35 @@ function App() {
 
 
   const selectedDayTasks = calendarTasks.filter(task => {
-    if (!task.start_time || !task.end_time) return false;
+    if (!task.start_time) return false;
     try {
       const taskStart = new Date(normalizeToUTC(task.start_time));
-      const taskEnd = new Date(normalizeToUTC(task.end_time));
+      let taskEnd = task.end_time ? new Date(normalizeToUTC(task.end_time)) : null;
+
+      // Fallback for missing end_time (assume 30 mins)
+      if (!taskEnd || isNaN(taskEnd.getTime())) {
+        taskEnd = new Date(taskStart.getTime() + 30 * 60000);
+      }
 
       const dayStart = new Date(selectedDate);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(dayStart);
       dayEnd.setDate(dayEnd.getDate() + 1);
 
-      // Standard interval overlap: (StartA < EndB) and (EndA > StartB)
       return taskStart < dayEnd && taskEnd > dayStart;
     } catch (e) { return false; }
   }).map(task => {
-    // Add visual segment info
-    const targetDateStr = toLocalISOString(selectedDate).split('T')[0];
-    const startLocal = toLocalISOString(new Date(normalizeToUTC(task.start_time))).split('T')[0];
-    const endLocal = toLocalISOString(new Date(normalizeToUTC(task.end_time))).split('T')[0];
+    const targetDateStr = formatToLocalDate(selectedDate);
+    const startLocal = formatToLocalDate(new Date(normalizeToUTC(task.start_time)));
+
+    // Fallback for endLocal calculation
+    let endLocal;
+    if (task.end_time) {
+      endLocal = formatToLocalDate(new Date(normalizeToUTC(task.end_time)));
+    } else {
+      // Default to same day if missing
+      endLocal = startLocal;
+    }
 
     let taskType = 'normal';
     if (startLocal !== endLocal) {
@@ -516,11 +604,22 @@ function App() {
         const existingOriginal = new Date(normalizeToUTC(conflictModal.existingTask.start_time));
         if (existingOriginal.getTime() !== dtObj.getTime()) {
           try {
-            await jobService.updateTask(conflictModal.existingTask.id, {
-              start_time: toUTC(mergedIso),
-              end_time: mergedEndIso ? toUTC(mergedEndIso) : null,
-              ignore_conflicts: force
-            });
+            if (conflictModal.existingTask.isCandidate) {
+              await jobService.updateJobCandidate(conflictModal.existingTask.id, {
+                parameters: {
+                  title: conflictModal.existingTask.title,
+                  start_time: toUTC(mergedIso),
+                  end_time: mergedEndIso ? toUTC(mergedEndIso) : null
+                },
+                command_type: 'CREATE_TASK'
+              });
+            } else {
+              await jobService.updateTask(conflictModal.existingTask.id, {
+                start_time: toUTC(mergedIso),
+                end_time: mergedEndIso ? toUTC(mergedEndIso) : null,
+                ignore_conflicts: force
+              });
+            }
           } catch (err) {
             if (err.response?.status === 409) {
               let secondaryConflict = err.response.data.detail;
@@ -591,7 +690,11 @@ function App() {
           return;
         }
 
-        await finalizeAcceptance(conflictModal.newTask.candidateId, force);
+        const idsToAccept = [conflictModal.newTask.candidateId];
+        if (conflictModal.existingTask?.isCandidate) {
+          idsToAccept.push(conflictModal.existingTask.id);
+        }
+        await finalizeAcceptance(idsToAccept, force);
       } else {
         await jobService.updateTask(conflictModal.newTask.id, {
           start_time: toUTC(mergedNewIso),
@@ -602,8 +705,6 @@ function App() {
       }
 
       setConflictModal({ ...conflictModal, isOpen: false });
-      setTaskEditingId(null);
-      setTaskEditForm({});
       if (jobId) await refreshPreview(jobId);
       // setShowToast(true); // Assuming setShowToast is defined elsewhere
       // setTimeout(() => setShowToast(false), 3000); // Assuming setShowToast is defined elsewhere
@@ -653,12 +754,12 @@ function App() {
         onLogout={handleLogout}
       />
 
-      {activePage !== 'preferences' && (
+      {activePage === 'create' && (
         <>
           <div className={`container ${status === 'preview' ? 'blur-bg' : ''}`}>
 
             {/* Hero Section */}
-            <div className="hero-section" style={{ textAlign: 'center' }}>
+            <div className="hero-section" style={{ textAlign: 'center' }} ref={inputRef}>
               <h1>Momentra Calendar</h1>
               <p>Describe your events in your words</p>
             </div>
@@ -670,6 +771,9 @@ function App() {
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
+                  onFocus={() => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -710,62 +814,66 @@ function App() {
             </div>
 
             {/* Home: Calendar Dashboard Card */}
-            <div className="calendar-dashboard-card">
-              <h2 className="section-header">Upcoming Events</h2>
-              <CalendarStrip
-                tasks={calendarTasks}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-              />
-            </div>
-
-            <div className="day-tasks-header">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span className="schedule-day-name">{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule</span>
-                <span className="schedule-date-label">{selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div className="event-badge-premium">
-                  <span className="event-count">{selectedDayTasks.length}</span>
-                  <span className="event-label">{selectedDayTasks.length === 1 ? 'event' : 'events'}</span>
+            {(status === 'input' || status === 'preview') && (
+              <>
+                <div className="calendar-dashboard-card">
+                  <h2 className="section-header">Upcoming Events</h2>
+                  <CalendarStrip
+                    tasks={calendarTasks}
+                    selectedDate={selectedDate}
+                    onSelectDate={handleSelectDate}
+                  />
                 </div>
-                <button
-                  className="search-btn"
-                  onClick={handleSearchOpen}
-                  title="Search events"
-                >
-                  <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
-                </button>
-              </div>
-            </div>
 
-            <div className="day-tasks-list">
-              {selectedDayTasks.length === 0 ? (
-                <p className="empty-tasks">No events scheduled</p>
-              ) : (
-                selectedDayTasks.map(task => {
-                  let displayTime = `${formatToLocalTime(task.start_time, preferences?.time_format_24h)} - ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
-                  if (task.taskType === 'task-start') displayTime = `Start ${formatToLocalTime(task.start_time, preferences?.time_format_24h)}`;
-                  else if (task.taskType === 'task-end') displayTime = `End ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
-                  else if (task.taskType === 'task-middle') displayTime = 'Continued';
-
-                  return (
-                    <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
-                      <div className="task-time">
-                        {displayTime}
-                      </div>
-                      <div className="task-content">
-                        <h4>{task.title}</h4>
-                      </div>
-                      <div className="task-actions">
-                        <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
-                        <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
-                      </div>
+                <div className="day-tasks-header" ref={scheduleRef}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="schedule-day-name">{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}'s Schedule</span>
+                    <span className="schedule-date-label">{selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div className="event-badge-premium">
+                      <span className="event-count">{selectedDayTasks.length}</span>
+                      <span className="event-label">{selectedDayTasks.length === 1 ? 'event' : 'events'}</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <button
+                      className="search-btn"
+                      onClick={handleSearchOpen}
+                      title="Search events"
+                    >
+                      <span style={{ fontSize: '20px', fontWeight: 'bold' }}>⌕</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="day-tasks-list">
+                  {selectedDayTasks.length === 0 ? (
+                    <p className="empty-tasks">No events scheduled</p>
+                  ) : (
+                    selectedDayTasks.map(task => {
+                      let displayTime = `${formatToLocalTime(task.start_time, preferences?.time_format_24h)} - ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
+                      if (task.taskType === 'task-start') displayTime = `Start ${formatToLocalTime(task.start_time, preferences?.time_format_24h)}`;
+                      else if (task.taskType === 'task-end') displayTime = `End ${formatToLocalTime(task.end_time, preferences?.time_format_24h)}`;
+                      else if (task.taskType === 'task-middle') displayTime = 'Continued';
+
+                      return (
+                        <div key={task.id} className={`task-row ${task.taskType !== 'normal' ? 'multi-day' : ''} ${task.taskType} ${highlightedTaskId === task.id ? 'highlighted' : ''}`}>
+                          <div className="task-time">
+                            {displayTime}
+                          </div>
+                          <div className="task-content">
+                            <h4>{task.title}</h4>
+                          </div>
+                          <div className="task-actions">
+                            <button className="icon-btn edit-btn" onClick={() => handleEditOpen(task, 'task')}>✎</button>
+                            <button className="icon-btn delete-btn" onClick={() => handleDeleteTask(task.id)}>🗑</button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Review Modal Overlay */}
@@ -776,7 +884,7 @@ function App() {
                   <div className="review-header">
                     <div className="header-top">
                       <h2>Review Events</h2>
-                      <button onClick={reset} className="close-btn">✕</button>
+                      <button onClick={handleCloseReview} className="close-btn">✕</button>
                     </div>
                     <p className="sub-header">{candidates.length} events created</p>
                   </div>
@@ -796,31 +904,49 @@ function App() {
                           <div className="detail-row">
                             <span className="detail-icon">📅</span>
                             <span className="detail-text">
-                              {candidate.parameters.start_time
-                                ? new Date(normalizeToUTC(candidate.parameters.start_time)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                                : 'No date'}
-                            </span>
-                          </div>
-                          <div className="detail-row">
-                            <span className="detail-icon">🕒</span>
-                            <span className="detail-text">
-                              {candidate.parameters.start_time ? (
-                                <>
-                                  {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time), preferences?.time_format_24h)}
-                                  {candidate.parameters.end_time && (() => {
-                                    const startDt = new Date(normalizeToUTC(candidate.parameters.start_time));
-                                    const endDt = new Date(normalizeToUTC(candidate.parameters.end_time));
-                                    const isDiffDay = startDt.toDateString() !== endDt.toDateString();
-                                    const timeStr = formatToLocalTime(normalizeToUTC(candidate.parameters.end_time), preferences?.time_format_24h);
+                              {(() => {
+                                const startStr = candidate.parameters.start_time || (() => {
+                                  try { return JSON.parse(candidate.parameters.options?.[0]?.value || '{}').start_time } catch (e) { }
+                                })();
+                                if (!startStr) return 'No date';
 
-                                    return (
-                                      <> - {timeStr} {isDiffDay && <span style={{ fontSize: '0.85em', opacity: 0.7, marginLeft: '4px' }}>(+1)</span>}</>
-                                    );
-                                  })()}
-                                </>
-                              ) : 'No time'}
+                                const startDt = new Date(normalizeToUTC(startStr));
+                                const endStr = candidate.parameters.end_time;
+
+                                if (endStr) {
+                                  const endDt = new Date(normalizeToUTC(endStr));
+                                  if (startDt.toDateString() !== endDt.toDateString()) {
+                                    return `${startDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                                  }
+                                }
+
+                                return startDt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                              })()}
                             </span>
                           </div>
+                          {(!candidate.parameters.start_time && candidate.command_type === 'AMBIGUITY') ? null : (
+                            <div className="detail-row">
+                              <span className="detail-icon">🕒</span>
+                              <span className="detail-text">
+                                {candidate.parameters.start_time ? (
+                                  <>
+                                    {formatToLocalTime(normalizeToUTC(candidate.parameters.start_time), preferences?.time_format_24h)}
+                                    {candidate.parameters.end_time && (() => {
+                                      const startDt = new Date(normalizeToUTC(candidate.parameters.start_time));
+                                      const endDt = new Date(normalizeToUTC(candidate.parameters.end_time));
+                                      const isDiffDay = startDt.toDateString() !== endDt.toDateString();
+                                      const timeStr = formatToLocalTime(normalizeToUTC(candidate.parameters.end_time), preferences?.time_format_24h);
+
+
+                                      return (
+                                        <> - {timeStr}</>
+                                      );
+                                    })()}
+                                  </>
+                                ) : 'No time'}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Content Area (Ambiguity OR Actions) */}
@@ -857,8 +983,14 @@ function App() {
                                   btnClass += " btn-icon-replace";
                                 }
 
+                                if (!(opt.suggested || val.suggested)) {
+                                  if (label.includes('AM')) btnClass += " btn-icon-am";
+                                  else if (label.includes('PM')) btnClass += " btn-icon-pm";
+                                }
+                                if (label.toLowerCase().includes('reject')) btnClass += " btn-icon-discard";
+
                                 return (
-                                  <button key={i} className={btnClass} style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={async () => {
+                                  <button key={i} className={btnClass} onClick={async () => {
 
                                     if (val.discard) {
                                       await jobService.deleteJobCandidate(candidate.id);
@@ -875,15 +1007,18 @@ function App() {
                                       });
 
                                       let removeId = null;
+                                      let isExistingCandidate = false;
                                       if (replaceOption) {
                                         try {
-                                          removeId = JSON.parse(replaceOption.value).remove_task_id;
+                                          const parsed = JSON.parse(replaceOption.value);
+                                          removeId = parsed.remove_task_id || parsed.remove_candidate_id;
+                                          isExistingCandidate = !!parsed.remove_candidate_id;
                                         } catch (e) { }
                                       }
 
                                       // Manual Adjustment Flow
                                       let existingTask = null;
-                                      if (removeId) {
+                                      if (removeId && !isExistingCandidate) {
                                         // Try local find first
                                         existingTask = calendarTasks.find(t => t.id === removeId);
                                         if (!existingTask) {
@@ -896,7 +1031,8 @@ function App() {
                                           id: removeId,
                                           title: candidate.parameters.existing_title,
                                           start_time: candidate.parameters.existing_start_time,
-                                          end_time: candidate.parameters.existing_end_time
+                                          end_time: candidate.parameters.existing_end_time,
+                                          isCandidate: isExistingCandidate
                                         };
                                       }
 
@@ -919,7 +1055,8 @@ function App() {
                                           id: existingTask.id || removeId,
                                           title: existingTask.title,
                                           start_time: existingTask.start_time,
-                                          end_time: existingTask.end_time
+                                          end_time: existingTask.end_time,
+                                          isCandidate: existingTask.isCandidate || isExistingCandidate
                                         } : null,
                                         newTaskTime,
                                         existingTaskTime,
@@ -994,9 +1131,15 @@ function App() {
                                   closeConfirm();
                                 }
                               });
-                            }}>Reject</button>
-                            <button className="action-btn edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>Edit</button>
-                            <button className="action-btn accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>Accept</button>
+                            }}>
+                              <X size={16} /> <span>Reject</span>
+                            </button>
+                            <button className="action-btn edit-btn-neutral" onClick={() => handleEditOpen(candidate, 'candidate')}>
+                              <Edit3 size={16} /> <span>Edit</span>
+                            </button>
+                            <button className="action-btn accept-btn" onClick={() => finalizeAcceptance(candidate.id)}>
+                              <Check size={16} /> <span>Accept</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1039,7 +1182,6 @@ function App() {
                 <div className="conflict-modal">
                   <div className="conflict-header">
                     <h2>Resolve Time Conflict</h2>
-                    <button className="close-btn" onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}>×</button>
                   </div>
                   <p className="conflict-subtext">Adjust the times for these overlapping events:</p>
 
@@ -1048,6 +1190,27 @@ function App() {
                     <div className="conflict-task-card new-task">
                       <div className="task-badge new">New</div>
                       <h4>{conflictModal.newTask?.title || 'New Task'}</h4>
+
+                      {/* Suggestion Button */}
+                      {conflictModal.suggestion && (
+                        <button
+                          className="suggestion-btn"
+                          onClick={() => {
+                            const s = conflictModal.suggestion;
+                            const localStart = formatToLocalTime(normalizeToUTC(s.start_time));
+                            const localDate = normalizeToUTC(s.start_time).split('T')[0];
+                            setConflictModal(prev => ({
+                              ...prev,
+                              newTaskTime: localStart,
+                              newTaskDate: localDate
+                            }));
+                          }}
+                        >
+                          <span style={{ marginRight: '4px' }}>✨</span>
+                          Suggested: {formatToLocalTime(normalizeToUTC(conflictModal.suggestion.start_time))} - {formatToLocalTime(normalizeToUTC(conflictModal.suggestion.end_time))}
+                        </button>
+                      )}
+
                       <div className="edit-time-container attention-sparkle">
                         <div className="edit-time-row-split">
                           <label>Start</label>
@@ -1245,6 +1408,10 @@ function App() {
             setPreferences={setPreferences}
           />
         </div>
+      )}
+
+      {activePage === 'templates' && (
+        <TemplatesPage onSelectTemplate={handleSelectTemplate} />
       )}
     </>
   )
