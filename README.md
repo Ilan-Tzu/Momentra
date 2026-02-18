@@ -215,6 +215,39 @@ Momentra isn't just another calendar app—it's your intelligent scheduling comp
 
 ---
 
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- Python 3.12+
+- PostgreSQL (or use the default SQLite for dev)
+
+### 1. Backend Setup
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your API keys
+uvicorn app.main:app --reload
+```
+
+### 2. Frontend Setup
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+### 3. Access
+- **Frontend**: [http://localhost:5173](http://localhost:5173)
+- **Backend API**: [http://localhost:8000](http://localhost:8000)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
 ## 🔐 Configuration & Secrets Management
 
 Momentra uses a multi-layered configuration strategy to ensure security and ease of deployment.
